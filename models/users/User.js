@@ -2,10 +2,11 @@ const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true },
+    name: { type: String },
     email: { type: String, unique: true, sparse: true },
     phone: { type: String, unique: true, required: true },
     otp: { type: String }, // stored temporarily for OTP login
+    otpExpiry: { type: Date }, // OTP expiration timestamp
     verified: { type: Boolean, default: false },
     role: {
       type: String,
