@@ -3,8 +3,11 @@ const dotenv = require("dotenv");
 const connectDB = require("./config/db.js");
 const userAuthRoutes = require("./routes/auth/userAuthRoutes");
 const adminAuthRoutes = require("./routes/auth/adminAuthRoutes");
+const documentRoutes = require("./routes/documentRouter/documentRoutes");
 const errorHandler = require("./middlewares/errorHandler");
- 
+const authMiddleware = require("./middlewares/authMiddleware.js");
+const path = require("path");
+
 dotenv.config();
 
 const app = express();
@@ -13,13 +16,15 @@ const app = express();
 connectDB();
 
 // Middleware
-app.use(express.json());
+app.use(express.json()); 
 
 app.get("/", (req, res) => {
   res.send("API is running...");
 });
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/api/auth/user", userAuthRoutes);
 app.use("/api/auth/admin", adminAuthRoutes);
+app.use("/api/documents", authMiddleware, documentRoutes);
 
 app.use(errorHandler);
 
