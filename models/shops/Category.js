@@ -7,7 +7,7 @@ const categorySchema = new mongoose.Schema(
     verticalImageUrl: { type: String },
     mainIconUrl: { type: String },
     oneLiner: { type: String },
-    sortOrder: { type: Number, default: 0 },
+    sequence: { type: Number },
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }
