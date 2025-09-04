@@ -6,7 +6,7 @@ const adminAuthRoutes = require("./routes/auth/adminAuthRoutes");
 const documentRoutes = require("./routes/documentRouter/documentRoutes");
 const shopsRoutes = require("./routes/shops/Shop.js");
 const addressRoutes = require("./routes/users/addressRoutes.js");
-const categoriesRoutes = require("./routes/shops/categoryRoutes.js");
+// const categoriesRoutes = require("./routes/shops/categoriesRoutes.js");
 const errorHandler = require("./middlewares/errorHandler");
 const authMiddleware = require("./middlewares/authMiddleware.js");
 const path = require("path");
@@ -30,7 +30,7 @@ app.use("/api/auth/admin", adminAuthRoutes);
 app.use("/api/documents", authMiddleware, documentRoutes);
 app.use("/api/shops", authMiddleware, shopsRoutes);
 app.use("/api/addresses", addressRoutes);
-app.use("/api/categories", categoriesRoutes);
+// app.use("/api/categories", categoriesRoutes);
 
 app.use(errorHandler);
 

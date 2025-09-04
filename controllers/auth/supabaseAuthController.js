@@ -13,7 +13,15 @@ exports.adminLogin = async (req, res) => {
 
     if (error) return res.status(400).json({ error: error.message });
 
-    return res.json({ message: "Admin login successful", data });
+    // Extract only email and access token from the response
+    const { user, session } = data;
+    const response = {
+      message: "Admin login successful",
+      email: user.email,
+      access_token: session.access_token
+    };
+
+    return res.json(response);
   } catch (err) {
     console.error("Error in adminLogin:", err);
     res.status(500).json({ error: "Server error" });
