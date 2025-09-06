@@ -1,4 +1,5 @@
 const Document = require("../../models/content/Document");
+const User = require("../../models/users/User");
 
 // Upload single document
 exports.uploadDocument = async (req, res) => {
@@ -47,7 +48,6 @@ exports.uploadDocument = async (req, res) => {
 };
 
 
-
 // Get all documents for a vendor
 exports.showVendorDocuments = async (req, res) => {
   try {
@@ -83,7 +83,6 @@ exports.showVendorDocuments = async (req, res) => {
     });
   }
 };
-
 
 
 // Re-upload rejected document
@@ -138,6 +137,70 @@ exports.reUploadRejectedDocument = async (req, res) => {
     });
   } catch (error) {
     console.error("Error re-uploading document:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+};
+
+
+exports.bulkVerifyDocuments = async (req, res) => {
+  try {
+    const { updates, ownerId } = req.body;
+
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Request body must be a non-empty array",
+      });
+    }
+
+    // Process each document
+    for (const item of updates) {
+      const { id, status } = item;
+
+      if (typeof status !== "boolean") {
+        return res.status(400).json({
+          success: false,
+          message: "Status must be boolean (true = verified, false = rejected)",
+        });
+      }
+
+      const doc = await Document.findByIdAndUpdate(
+        id,
+        { status: status ? "verified" : "rejected" },
+        { new: true }
+      );
+
+      if (!doc) {
+        return res.status(404).json({
+          success: false,
+          message: `Document with ID ${id} not found`,
+        });
+      }
+    }
+
+    // Re-check all documents of this owner
+    const ownerDocuments = await Document.find({ ownerId });
+
+    let finalStatus = "pending";
+    if (ownerDocuments.every((doc) => doc.status === "verified")) {
+      finalStatus = "verified";
+    } else if (ownerDocuments.every((doc) => doc.status === "rejected")) {
+      finalStatus = "rejected";
+    }
+
+    await User.findByIdAndUpdate(ownerId, { isAdminVerified: finalStatus });
+
+    res.json({
+      success: true,
+      message: "Documents updated successfully",
+      // ownerDocuments,
+      userFinalStatus: finalStatus,
+    });
+  } catch (error) {
     res.status(500).json({
       success: false,
       message: "Server error",

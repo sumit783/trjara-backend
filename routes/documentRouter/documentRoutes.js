@@ -1,6 +1,6 @@
 const express = require("express");
 const upload = require("../../middlewares/upload");
-const { uploadDocument, showVendorDocuments, reUploadRejectedDocument } = require("../../controllers/content/documentController");
+const { uploadDocument, showVendorDocuments, reUploadRejectedDocument, bulkVerifyDocuments } = require("../../controllers/content/documentController");
 
 const router = express.Router();
 
@@ -8,5 +8,6 @@ const router = express.Router();
 router.post("/upload", upload.single("document"), uploadDocument);
 router.get("/vendor/:ownerId", showVendorDocuments);
 router.put("/reupload/:docId", upload.single("document"), reUploadRejectedDocument);
+router.patch("/verify", bulkVerifyDocuments);
 
 module.exports = router;

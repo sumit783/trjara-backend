@@ -46,11 +46,11 @@ exports.cleanupExpiredSessions = async () => {
     const result = await Session.deleteMany({
       expiresAt: { $lt: new Date() }
     });
-    
+
     // if (process.env.NODE_ENV === "development" && result.deletedCount > 0) {
     //   console.log(`🧹 Cleaned up ${result.deletedCount} expired sessions`);
     // }
-    
+
     return result.deletedCount;
   } catch (err) {
     console.error("Error cleaning up expired sessions:", err);
@@ -72,7 +72,7 @@ exports.verifyOtp = async (req, res) => {
 
     // Convert OTP to string for comparison
     const otpString = String(otp);
-    
+
     // if (process.env.NODE_ENV === "development") {
     //   console.log(`🔍 OTP Comparison:`, {
     //     receivedOtp: otp,
@@ -83,7 +83,7 @@ exports.verifyOtp = async (req, res) => {
     //     isMatch: user.otp === otpString
     //   });
     // }
-    
+
     if (user.otp !== otpString) {
       return res.status(400).json({ error: "Invalid OTP" });
     }
@@ -110,32 +110,32 @@ exports.verifyOtp = async (req, res) => {
       fcmToken: req.body.fcmToken || null,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
-    
+
     try {
       await session.save();
-      
-    //   if (process.env.NODE_ENV === "development") {
-    //     console.log(`📱 Session created:`, {
-    //       sessionId: session._id,
-    //       userId: session.userId,
-    //       deviceInfo: session.deviceInfo,
-    //       expiresAt: session.expiresAt
-    //     });
-    //   }
-      
-      res.json({ 
-        message: "Login successful", 
-        token, 
+
+      //   if (process.env.NODE_ENV === "development") {
+      //     console.log(`📱 Session created:`, {
+      //       sessionId: session._id,
+      //       userId: session.userId,
+      //       deviceInfo: session.deviceInfo,
+      //       expiresAt: session.expiresAt
+      //     });
+      //   }
+
+      res.json({
+        message: "Login successful",
+        token,
         user,
         sessionId: session._id // Include session ID for logout
       });
     } catch (sessionError) {
       console.error("Error creating session:", sessionError);
       // Still return success but without session
-      res.json({ 
-        message: "Login successful (session creation failed)", 
-        token, 
-        user 
+      res.json({
+        message: "Login successful (session creation failed)",
+        token,
+        user
       });
     }
   } catch (err) {
@@ -156,11 +156,11 @@ exports.logout = async (req, res) => {
     }
 
     await Session.findByIdAndDelete(sessionId);
-    
+
     // if (process.env.NODE_ENV === "development") {
     //   console.log(`🚪 User logged out, session deleted:`, sessionId);
     // }
-    
+
     res.json({ message: "Logged out successfully" });
   } catch (err) {
     console.error("Error in logout:", err);

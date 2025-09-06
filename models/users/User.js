@@ -16,7 +16,7 @@ const userSchema = new mongoose.Schema(
     defaultAddressId: { type: mongoose.Schema.Types.ObjectId, ref: "Address" },
     profileImageUrl: { type: String },
     isActive: { type: Boolean, default: true },
-    isAdminVerified: { type: Boolean, default: false },
+    isAdminVerified: { type: String, enum: ["pending", "verified", "rejected"], default: 'pending' },
   },
   { timestamps: true }
 );
