@@ -1,13 +1,16 @@
-const mongoose = require("mongoose");
+// models/variant/VariantOption.js
+import mongoose from "mongoose";
 
-const variantOptionSchema = new mongoose.Schema(
+const VariantOptionSchema = new mongoose.Schema(
   {
-    productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
-    name: { type: String, required: true }, // e.g. Color | Size | Material
-    values: [{ type: String, required: true }], // ['Black', 'Green']
-    imageUrls: [{ type: String }],
+    name: { type: String, required: true, trim: true }, // e.g. "Color", "Size"
+    values: [{ type: String, required: true }], // e.g. ["Red","Black","Blue"]
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // admin id
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model("VariantOption", variantOptionSchema);
+// Optional index for quick lookups by name
+VariantOptionSchema.index({ name: 1 }, { unique: false });
+
+export default mongoose.model("VariantOption", VariantOptionSchema);

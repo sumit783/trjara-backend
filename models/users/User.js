@@ -10,7 +10,7 @@ const userSchema = new mongoose.Schema(
     verified: { type: Boolean, default: false },
     role: {
       type: String,
-      enum: ["customer", "owner", "rider", "admin"],
+      enum: ["customer", "owner", "rider", "admin","staff"],
       default: "customer",
     },
     defaultAddressId: { type: mongoose.Schema.Types.ObjectId, ref: "Address" },

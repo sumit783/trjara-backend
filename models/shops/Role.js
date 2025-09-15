@@ -2,7 +2,6 @@ const mongoose = require("mongoose");
 
 const roleSchema = new mongoose.Schema(
   {
-    shopId: { type: mongoose.Schema.Types.ObjectId, ref: "Shop", required: true },
     name: { type: String, required: true }, // Admin | Manager | Cashier | Inventory
     permissions: {
       type: Map,

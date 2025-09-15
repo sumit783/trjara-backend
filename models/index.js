@@ -15,6 +15,10 @@ const Category = require("./shops/Category.js");
 const Product = require("./shops/Product.js");
 const VariantOption = require("./shops/VariantOption.js");
 const Inventory = require("./shops/Inventory.js");
+const InventoryVariant = require("./shops/InventoryVariant.js");
+const Barcode = require("./shops/Barcode.js");
+const QRCode = require("./shops/QRCode.js");
+const Charge = require("./charges/Charge.js");
 
 // ==========================
 // Order & Delivery Models
@@ -80,6 +84,10 @@ module.exports = {
   Product,
   VariantOption,
   Inventory,
+  InventoryVariant,
+  Barcode,
+  QRCode,
+  Charge,
 
   // Orders
   Order,
