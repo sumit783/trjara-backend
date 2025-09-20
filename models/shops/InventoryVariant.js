@@ -1,5 +1,5 @@
 // models/variant/InventoryVariant.js
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const InventoryVariantSchema = new mongoose.Schema(
   {
@@ -17,4 +17,4 @@ const InventoryVariantSchema = new mongoose.Schema(
 InventoryVariantSchema.index({ inventoryId: 1 });
 InventoryVariantSchema.index({ barcode: 1 }, { sparse: true });
 
-export default mongoose.model("InventoryVariant", InventoryVariantSchema);
+module.exports = mongoose.model("InventoryVariant", InventoryVariantSchema);
