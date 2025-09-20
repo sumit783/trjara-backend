@@ -22,7 +22,7 @@ exports.createCategory = async (req, res) => {
             });
         }
 
-        const slug = await generateUniqueSlug(title);
+        const slug = await generateUniqueSlug(title, Category);
 
         const verticalImageUrl = req.files?.["verticalImageUrl"]
             ? `/uploads/${req.files["verticalImageUrl"][0].filename}`
@@ -80,7 +80,7 @@ exports.updateCategory = async (req, res) => {
 
         if (title && title !== category.title) {
             category.title = title;
-            category.slug = await generateUniqueSlug(title);
+            category.slug = await generateUniqueSlug(title, Category);
         }
 
         if (oneLiner) category.oneLiner = oneLiner;

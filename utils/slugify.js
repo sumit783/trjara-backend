@@ -1,13 +1,11 @@
-const Category = require("../models/shops/Category");
-
-async function generateUniqueSlug(title) {
+async function generateUniqueSlug(title, model) {
     // Generate base slug from title
     let baseSlug = toSlug(title, { lower: true, strict: true });
     let slug = baseSlug;
     let counter = 1;
 
     // Check if slug already exists in DB
-    while (await Category.findOne({ slug })) {
+    while (await model.findOne({ slug })) {
         slug = `${baseSlug}-${counter++}`;
     }
     return slug;
