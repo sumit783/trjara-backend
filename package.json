@@ -8,7 +8,7 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "release": "standard-version",
-    "postrelease": "node ./scripts/update-readme.js",
+    "postrelease": "node ./scripts/generate-changelog-from-commits.js",
     "prepare": "husky install"
   },
   "repository": {
