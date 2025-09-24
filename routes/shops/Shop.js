@@ -1,7 +1,6 @@
 const express = require("express");
 const upload = require("../../middlewares/upload");
 const { CreateVendorShop, EditVendorShop } = require("../../controllers/shops/Shop");
-const rolesRoutes = require("./rolesRoutes");
 const staffRoutes = require("./staffRoutes");
 
 const router = express.Router();
@@ -26,7 +25,6 @@ router.put(
 );
 
 // nested shop-related routes
-router.use("/roles", rolesRoutes);
 router.use("/staff", staffRoutes);
 
 module.exports = router;

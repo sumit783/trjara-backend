@@ -27,6 +27,17 @@ const authMiddleware = async (req, res, next) => {
 
     // Add user to request object
     req.user = user;
+    
+    // Add shopId to request object if available in token (for staff users)
+    if (decoded.shopId) {
+      req.shopId = decoded.shopId;
+    }
+    
+    // Add staffId to request object if available in token (for staff users)
+    if (decoded.staffId) {
+      req.staffId = decoded.staffId;
+    }
+    
     next();
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {

@@ -1,6 +1,8 @@
 // controllers/auth/authController.js
 const User = require("../../models/users/User");
 const Session = require("../../models/users/Session");
+const Staff = require("../../models/shops/Staff");
+const Shop = require("../../models/shops/Shop");
 const jwt = require("jsonwebtoken");
 
 const OTP_EXPIRY = 5 * 60 * 1000; // 5 minutes
@@ -98,8 +100,35 @@ exports.verifyOtp = async (req, res) => {
     user.otpExpiry = null;
     await user.save();
 
-    // Create JWT token
-    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
+    // If user is staff, fetch staff data with populated role
+    let staffData = null;
+    if (user.role === "staff") {
+      staffData = await Staff.findOne({ userId: user._id, active: true })
+        .populate("roleId", "name permissions")
+        .populate("shopId", "name");
+      
+      if (!staffData) {
+        return res.status(403).json({ error: "Staff record not found or inactive" });
+      }
+    }
+
+    // If user is owner, fetch owned shop(s)
+    let ownerShops = null;
+    if (user.role === "owner") {
+      ownerShops = await Shop.find({ ownerUserId: user._id })
+        .select("name type businessType phone email gstin status logoUrl coverImageUrl");
+    }
+
+    // Create JWT token with additional staff info if applicable
+    const tokenPayload = { 
+      id: user._id, 
+      role: user.role,
+      ...(staffData && { 
+        staffId: staffData._id, 
+        shopId: staffData.shopId._id 
+      })
+    };
+    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
       expiresIn: "7d",
     });
 
@@ -123,20 +152,44 @@ exports.verifyOtp = async (req, res) => {
       //     });
       //   }
 
-      res.json({
+      const responseData = {
         message: "Login successful",
         token,
         user,
         sessionId: session._id // Include session ID for logout
-      });
+      };
+
+      // Include staff data if user is staff
+      if (staffData) {
+        responseData.staff = staffData;
+      }
+
+      // Include owner shops if user is owner
+      if (ownerShops) {
+        responseData.shops = ownerShops;
+      }
+
+      res.json(responseData);
     } catch (sessionError) {
       console.error("Error creating session:", sessionError);
       // Still return success but without session
-      res.json({
+      const responseData = {
         message: "Login successful (session creation failed)",
         token,
         user
-      });
+      };
+
+      // Include staff data if user is staff
+      if (staffData) {
+        responseData.staff = staffData;
+      }
+
+      // Include owner shops if user is owner
+      if (ownerShops) {
+        responseData.shops = ownerShops;
+      }
+
+      res.json(responseData);
     }
   } catch (err) {
     console.error("Error in verifyOtp:", err);

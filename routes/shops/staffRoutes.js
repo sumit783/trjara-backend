@@ -1,18 +1,17 @@
 const express = require("express");
 const router = express.Router();
 const staffController = require("../../controllers/shops/staffController");
+const authMiddleware = require("../../middlewares/authMiddleware");
 
-// Staff signup (no OTP)
-router.post("/signup", staffController.signupStaff);
+// Staff signup (no OTP) - requires authentication to get shopId from token
+router.get("/roles",authMiddleware,staffController.getRoles);
 
-// Staff login via OTP
-router.post("/login/request-otp", staffController.requestStaffLoginOtp);
-router.post("/login/verify-otp", staffController.verifyStaffLoginOtp);
+router.post("/signup", authMiddleware, staffController.signupStaff);
 
-// Staff management
-router.get("/", staffController.listStaff);
-router.put("/:id", staffController.updateStaff);
-router.delete("/:id", staffController.deleteStaff);
+// Staff management - requires authentication to get shopId from token
+router.get("/", authMiddleware, staffController.listStaff);
+router.put("/:id", authMiddleware, staffController.updateStaff);
+router.delete("/:id", authMiddleware, staffController.deleteStaff);
 
 module.exports = router;
 
