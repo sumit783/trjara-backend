@@ -13,6 +13,8 @@ const { adminAuthMiddleware } = require("../../middlewares/adminAuthMiddleware")
 
 const router = express.Router();
 
+
+
 // Admin authentication routes
 router.post("/login", adminLogin);
 router.post("/logout", adminLogout);
