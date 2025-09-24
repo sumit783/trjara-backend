@@ -3,14 +3,12 @@
 
 <!-- CHANGELOG:START -->
 
-# Changelog
+## Changelog (generated from git commits)
 
-All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
+> Range: v1.0.3..HEAD
 
-### [1.0.3](https://github.com/sumit783/trjara-backend/compare/v1.0.2...v1.0.3) (2025-09-24)
-
-### [1.0.2](https://github.com/sumit783/trjara-backend/compare/v1.0.1...v1.0.2) (2025-09-24)
-
-### 1.0.1 (2025-09-24)
+| Developer | Commits |
+|---|---|
+| **SumitMaharana-783** | - updated readme file |
 
 <!-- CHANGELOG:END -->
