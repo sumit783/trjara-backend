@@ -9,6 +9,6 @@
 
 | Developer | Commits |
 |---|---|
-| **SumitMaharana-783** | - updated readme file |
+| **SumitMaharana-783** | - testing<br>- setup readme like like auto update when push a code<br>- test: update README changelog<br>- updated readme file |
 
 <!-- CHANGELOG:END -->
