@@ -1,15 +1,52 @@
 const mongoose = require("mongoose");
 
 const riderSchema = new mongoose.Schema(
-  {
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    vehicleId: { type: mongoose.Schema.Types.ObjectId, ref: "Vehicle" },
-    status: { type: String, enum: ["offline", "idle", "busy"], default: "offline" },
-    currentLat: { type: Number },
-    currentLng: { type: Number },
-    availableFrom: { type: Date },
+{
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+    unique: true
   },
-  { timestamps: true, versionKey: false }
+
+  vehicleType: {
+    type: String,
+    enum: ["bike", "cycle", "scooter"]
+  },
+
+  isOnline: {
+    type: Boolean,
+    default: false
+  },
+
+  isAvailable: {
+    type: Boolean,
+    default: true
+  },
+
+  currentOrder: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Order"
+  },
+
+  rating: {
+    type: Number,
+    default: 5
+  },
+
+  totalDeliveries: {
+    type: Number,
+    default: 0
+  },
+
+  verificationStatus: {
+    type: String,
+    enum: ["pending","verified","rejected"],
+    default: "pending"
+  }
+
+},
+{ timestamps: true }
 );
 
 module.exports = mongoose.model("Rider", riderSchema);

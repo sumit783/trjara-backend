@@ -4,18 +4,19 @@ const {
     createCategory,
     updateCategory,
     deleteCategory,
-    getCategoriesByShop,
-    getCategoryBySequence,
+    getCategories,
+    getCategory,
 } = require("../../controllers/shops/categoryController");
+const { adminAuthMiddleware } = require("../../middlewares/adminAuthMiddleware");
 
 const router = express.Router();
 
-// Create category (with image uploads)
+// Create category (with image map to "image")
 router.post(
     "/",
+    adminAuthMiddleware,
     upload.fields([
-        { name: "verticalImageUrl", maxCount: 1 },
-        { name: "mainIconUrl", maxCount: 1 },
+        { name: "image", maxCount: 1 }
     ]),
     createCategory
 );
@@ -23,20 +24,20 @@ router.post(
 // Update category
 router.put(
     "/:categoryId",
+    adminAuthMiddleware,
     upload.fields([
-        { name: "verticalImageUrl", maxCount: 1 },
-        { name: "mainIconUrl", maxCount: 1 },
+        { name: "image", maxCount: 1 }
     ]),
     updateCategory
 );
 
 // Delete category
-router.delete("/:categoryId", deleteCategory);
+router.delete("/:categoryId", adminAuthMiddleware, deleteCategory);
 
-// Get all categories by shop
-router.get("/shop/:shopId", getCategoriesByShop);
+// Get all categories
+router.get("/", getCategories);
 
-// Get category by sequence within shop
-router.get("/shop/:shopId/sequence/:sequence", getCategoryBySequence);
+// Get category by slug or ID
+router.get("/:identifier", getCategory);
 
 module.exports = router;

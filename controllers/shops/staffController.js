@@ -1,5 +1,5 @@
 const Staff = require("../../models/shops/Staff");
-const Role = require("../../models/shops/Role");
+const Role = require("../../models/shops/ShopRole");
 const User = require("../../models/users/User");
 
 exports.getRoles = async (req, res) => {

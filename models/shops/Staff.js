@@ -1,16 +1,37 @@
 const mongoose = require("mongoose");
 
 const staffSchema = new mongoose.Schema(
-  {
-    shopId: { type: mongoose.Schema.Types.ObjectId, ref: "Shop", required: true },
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // Link to User
-    name: { type: String, required: true },
-    phone: { type: String },
-    email: { type: String },
-    roleId: { type: mongoose.Schema.Types.ObjectId, ref: "Role", required: true },
-    active: { type: Boolean, default: true },
+{
+  store: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Store",
+    required: true
   },
-  { timestamps: true }
+
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true
+  },
+
+  role: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "ShopRole",
+    required: true
+  },
+
+  joinedAt: {
+    type: Date,
+    default: Date.now
+  },
+
+  isActive: {
+    type: Boolean,
+    default: true
+  }
+
+},
+{ timestamps: true }
 );
 
 module.exports = mongoose.model("Staff", staffSchema);

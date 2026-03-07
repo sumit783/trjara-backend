@@ -8,25 +8,29 @@ const Session = require("./users/Session.js");
 // ==========================
 // Shop Models
 // ==========================
-const Shop = require("./shops/Shop.js");
+const Store = require("./shops/Store.js");
 const Staff = require("./shops/Staff.js");
-const Role = require("./shops/Role.js");
+const Role = require("./shops/ShopRole.js");
 const Category = require("./shops/Category.js");
 const Product = require("./shops/Product.js");
+const ProductVariant = require("./shops/ProductVariant.js");
 const VariantOption = require("./shops/VariantOption.js");
 const Inventory = require("./shops/Inventory.js");
-const InventoryVariant = require("./shops/InventoryVariant.js");
-const Barcode = require("./shops/Barcode.js");
+const InventoryLog = require("./shops/InventoryLog.js");
 const QRCode = require("./shops/QRCode.js");
 const Charge = require("./charges/Charge.js");
+const StoreDocument = require("./shops/StoreDocument.js");
+const StoreSettings = require("./shops/StoreSettings.js");
+const StoreTiming = require("./shops/StoreTiming.js");
 
 // ==========================
 // Order & Delivery Models
 // ==========================
 const Order = require("./orders/Order.js");
 const OrderItem = require("./orders/OrderItem.js");
-const Delivery = require("./orders/Delivery.js");
-const DeliveryPickup = require("./orders/DeliveryPickup.js");
+const OrderTimeline = require("./orders/OrderTimeline.js");
+const PickupVerification = require("./orders/PickupVerification.js");
+const DeliveryVerification = require("./orders/DeliveryVerification.js");
 
 // ==========================
 // Finance Models
@@ -65,7 +69,10 @@ const CartItem = require("./cart/CartItem.js");
 // Rider Models
 // ==========================
 const Rider = require("./rider/Rider.js");
-const Vehicle = require("./rider/Vehicle.js");
+const Vehicle = require("./rider/RiderVehicle.js");
+const RiderDocument = require("./rider/RiderDocument.js");
+const RiderEarning = require("./rider/RiderEarning.js");
+const RiderLocation = require("./rider/RiderLocation.js");
 
 // ==========================
 // Export all models
@@ -77,23 +84,27 @@ module.exports = {
   Session,
 
   // Shops
-  Shop,
+  Store,
   Staff,
   Role,
   Category,
   Product,
+  ProductVariant,
   VariantOption,
   Inventory,
-  InventoryVariant,
-  Barcode,
+  InventoryLog,
   QRCode,
   Charge,
+  StoreDocument,
+  StoreSettings,
+  StoreTiming,
 
   // Orders
   Order,
   OrderItem,
-  Delivery,
-  DeliveryPickup,
+  OrderTimeline,
+  PickupVerification,
+  DeliveryVerification,
 
   // Finance
   Payment,
@@ -123,4 +134,7 @@ module.exports = {
   // Rider
   Rider,
   Vehicle,
+  RiderDocument,
+  RiderEarning,
+  RiderLocation,
 };

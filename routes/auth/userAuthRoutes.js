@@ -1,19 +1,21 @@
 const express = require("express");
 const {
-  requestOtp,
+  sendOtp,
+  createAccount,
   verifyOtp,
   logout,
 } = require("../../controllers/auth/authController");
-const authMiddleware = require("../../middlewares/authMiddleware");
-const roleMiddleware = require("../../middlewares/roleMiddleware");
 const validateRequest = require("../../middlewares/validateRequest");
 const rateLimitMiddleware = require("../../middlewares/rateLimitMiddleware");
 const loggerMiddleware = require("../../middlewares/loggerMiddleware");
 
 const router = express.Router();
 
-// Request OTP
-router.post("/send-otp", rateLimitMiddleware, loggerMiddleware, validateRequest, requestOtp);
+// 1. Create Account (Signup)
+router.post("/create-account", rateLimitMiddleware, loggerMiddleware, validateRequest, createAccount);
+
+// 2. Send OTP (Login)
+router.post("/send-otp", rateLimitMiddleware, loggerMiddleware, validateRequest, sendOtp);
 
 // Verify OTP and login
 router.post("/verify-otp", rateLimitMiddleware, loggerMiddleware, validateRequest, verifyOtp);

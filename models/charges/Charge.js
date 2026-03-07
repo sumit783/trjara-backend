@@ -1,28 +1,112 @@
 // models/charges/Charge.js
+
 import mongoose from "mongoose";
 
 const ChargeSchema = new mongoose.Schema(
-  {
-    scope: {
-      type: String,
-      enum: ["global", "shop", "product", "inventory"],
-      required: true,
-      default: "global",
-    },
-    scopeId: { type: mongoose.Schema.Types.ObjectId, default: null }, // null for global
-    platformCharge: { type: Number, default: 0 },    // absolute or percentage (decide in business logic)
-    smallCartCharge: { type: Number, default: 0 },
-    deliveryCharge: { type: Number, default: 0 },
-    badWeatherCharge: { type: Number, default: 0 },
-    currency: { type: String, default: "INR" },
-    effectiveFrom: { type: Date, default: Date.now },
-    effectiveTo: { type: Date },
-    meta: { type: Object, default: {} }, // e.g., notes, type (percent|flat) if needed
+{
+  scope: {
+    type: String,
+    enum: ["global", "shop", "product", "inventory"],
+    default: "global",
+    required: true
   },
-  { timestamps: true }
+
+  scopeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    default: null // null means global
+  },
+
+  /* PLATFORM COMMISSION */
+
+  platformCharge: {
+    type: Number,
+    default: 0
+  },
+
+  platformChargeType: {
+    type: String,
+    enum: ["flat", "percentage"],
+    default: "percentage"
+  },
+
+  /* CART RELATED */
+
+  smallCartCharge: {
+    type: Number,
+    default: 0
+  },
+
+  smallCartThreshold: {
+    type: Number,
+    default: 0 // cart amount below this triggers charge
+  },
+
+  /* DELIVERY */
+
+  deliveryCharge: {
+    type: Number,
+    default: 0
+  },
+
+  perKmCharge: {
+    type: Number,
+    default: 0
+  },
+
+  baseDeliveryDistance: {
+    type: Number,
+    default: 3 // km included
+  },
+
+  /* SURGE */
+
+  badWeatherCharge: {
+    type: Number,
+    default: 0
+  },
+
+  surgeMultiplier: {
+    type: Number,
+    default: 1
+  },
+
+  /* CURRENCY */
+
+  currency: {
+    type: String,
+    default: "INR"
+  },
+
+  /* VALIDITY */
+
+  effectiveFrom: {
+    type: Date,
+    default: Date.now
+  },
+
+  effectiveTo: {
+    type: Date
+  },
+
+  /* PRIORITY */
+
+  priority: {
+    type: Number,
+    default: 0
+  },
+
+  meta: {
+    type: Object,
+    default: {}
+  }
+
+},
+{ timestamps: true }
 );
 
-// index to quickly query active charges for a scope
+/* INDEXES */
+
 ChargeSchema.index({ scope: 1, scopeId: 1 });
+ChargeSchema.index({ effectiveFrom: 1, effectiveTo: 1 });
 
 export default mongoose.model("Charge", ChargeSchema);

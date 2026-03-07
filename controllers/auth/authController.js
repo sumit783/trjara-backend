@@ -2,22 +2,22 @@
 const User = require("../../models/users/User");
 const Session = require("../../models/users/Session");
 const Staff = require("../../models/shops/Staff");
-const Shop = require("../../models/shops/Shop");
+const Shop = require("../../models/shops/Store");
+const AnalyticsEvent = require("../../models/logs/AnalyticsEvent");
 const jwt = require("jsonwebtoken");
 
 const OTP_EXPIRY = 5 * 60 * 1000; // 5 minutes
 
-// 📍 Step 1: Request OTP
-exports.requestOtp = async (req, res) => {
+// Step 1a: Request OTP (For existing users / Login)
+exports.sendOtp = async (req, res) => {
   try {
-    const { phone, role } = req.body;
+    const { phone } = req.body;
     if (!phone) return res.status(400).json({ error: "Phone is required" });
 
     let user = await User.findOne({ phone });
 
-    // If user not exists, create a new one
     if (!user) {
-      user = new User({ phone, role: role || "customer", verified: false });
+      return res.status(404).json({ error: "User not found. Please create an account first." });
     }
 
     // Fixed OTP for development, Random OTP for production
@@ -31,18 +31,69 @@ exports.requestOtp = async (req, res) => {
     user.otpExpiry = new Date(Date.now() + OTP_EXPIRY);
     await user.save();
 
-    // if (process.env.NODE_ENV === "development") {
-    //   console.log(`📌 OTP for ${phone}: ${otp}`);
-    // }
+    await AnalyticsEvent.create({
+      event: "otp_requested",
+      userId: user._id,
+      properties: { phone: user.phone },
+      source: req.headers["x-source"] && ["web", "android", "ios", "admin"].includes(req.headers["x-source"]) ? req.headers["x-source"] : "web"
+    });
 
     return res.json({ message: "OTP sent successfully" });
   } catch (err) {
-    console.error("Error in requestOtp:", err);
+    console.error("Error in sendOtp:", err);
     res.status(500).json({ error: "Server error" });
   }
 };
 
-// 📍 Cleanup expired sessions (can be called periodically)
+// Step 1b: Create Account (For new users / Signup)
+exports.createAccount = async (req, res) => {
+  try {
+    const { phone, role, name, email, profileImageUrl } = req.body;
+    if (!phone) return res.status(400).json({ error: "Phone is required" });
+
+    let user = await User.findOne({ phone });
+
+    if (user) {
+      return res.status(400).json({ error: "User already exists with this phone number." });
+    }
+
+    user = new User({ 
+      phone, 
+      role: role || "guest", 
+      name,
+      email,
+      profileImageUrl,
+      verified: false 
+    });
+
+    let otp = "1234";
+    if (process.env.NODE_ENV === "production") {
+      otp = Math.floor(1000 + Math.random() * 9000).toString();
+    }
+
+    user.otp = otp;
+    user.otpExpiry = new Date(Date.now() + OTP_EXPIRY);
+    await user.save();
+    if(user.role === "customer"){
+      user.isAdminVerified = "verified";
+      await user.save();
+    }
+
+    await AnalyticsEvent.create({
+      event: "user_registered",
+      userId: user._id,
+      properties: { phone: user.phone, role: user.role, email: user.email },
+      source: req.headers["x-source"] && ["web", "android", "ios", "admin"].includes(req.headers["x-source"]) ? req.headers["x-source"] : "web"
+    });
+
+    return res.status(201).json({ message: "Account created and OTP sent successfully" });
+  } catch (err) {
+    console.error("Error in createAccount:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+//Cleanup expired sessions (can be called periodically)
 exports.cleanupExpiredSessions = async () => {
   try {
     const result = await Session.deleteMany({
@@ -60,7 +111,7 @@ exports.cleanupExpiredSessions = async () => {
   }
 };
 
-// 📍 Step 2: Verify OTP
+// Step 2: Verify OTP
 exports.verifyOtp = async (req, res) => {
   try {
     const { phone, otp } = req.body;
@@ -75,18 +126,9 @@ exports.verifyOtp = async (req, res) => {
     // Convert OTP to string for comparison
     const otpString = String(otp);
 
-    // if (process.env.NODE_ENV === "development") {
-    //   console.log(`🔍 OTP Comparison:`, {
-    //     receivedOtp: otp,
-    //     receivedOtpType: typeof otp,
-    //     storedOtp: user.otp,
-    //     storedOtpType: typeof user.otp,
-    //     otpString: otpString,
-    //     isMatch: user.otp === otpString
-    //   });
-    // }
-
     if (user.otp !== otpString) {
+      user.otpAttempts = (user.otpAttempts || 0) + 1;
+      await user.save();
       return res.status(400).json({ error: "Invalid OTP" });
     }
 
@@ -98,6 +140,8 @@ exports.verifyOtp = async (req, res) => {
     user.verified = true;
     user.otp = null;
     user.otpExpiry = null;
+    user.otpAttempts = 0;
+    user.lastLogin = new Date();
     await user.save();
 
     // If user is staff, fetch staff data with populated role
@@ -142,6 +186,14 @@ exports.verifyOtp = async (req, res) => {
 
     try {
       await session.save();
+
+      await AnalyticsEvent.create({
+        event: "user_login",
+        userId: user._id,
+        sessionId: session._id,
+        properties: { role: user.role },
+        source: req.headers["x-source"] && ["web", "android", "ios", "admin"].includes(req.headers["x-source"]) ? req.headers["x-source"] : "web"
+      });
 
       //   if (process.env.NODE_ENV === "development") {
       //     console.log(`📱 Session created:`, {
@@ -197,7 +249,7 @@ exports.verifyOtp = async (req, res) => {
   }
 };
 
-// 📍 Step 3: Logout
+// Step 3: Logout
 exports.logout = async (req, res) => {
   try {
     const sessionId = req.body.sessionId;
@@ -208,7 +260,16 @@ exports.logout = async (req, res) => {
       return res.status(404).json({ error: "Session not found" });
     }
 
+    const userId = session.userId;
+
     await Session.findByIdAndDelete(sessionId);
+
+    await AnalyticsEvent.create({
+      event: "user_logout",
+      userId: userId,
+      sessionId: sessionId,
+      source: req.headers["x-source"] && ["web", "android", "ios", "admin"].includes(req.headers["x-source"]) ? req.headers["x-source"] : "web"
+    });
 
     // if (process.env.NODE_ENV === "development") {
     //   console.log(`🚪 User logged out, session deleted:`, sessionId);

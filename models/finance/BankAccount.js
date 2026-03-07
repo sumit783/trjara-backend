@@ -1,17 +1,49 @@
 const mongoose = require("mongoose");
 
 const bankAccountSchema = new mongoose.Schema(
-  {
-    shopId: { type: mongoose.Schema.Types.ObjectId, ref: "Shop", required: true },
-    holderName: { type: String, required: true },
-    accountNumberMasked: { type: String, required: true },
-    ifsc: { type: String, required: true },
-    bankName: { type: String, required: true },
-    upiId: { type: String },
-    isDefault: { type: Boolean, default: false },
+{
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true
   },
-  { timestamps: { createdAt: true, updatedAt: false } }
-);
 
+  accountHolderName: {
+    type: String,
+    required: true
+  },
+
+  bankName: {
+    type: String,
+    required: true
+  },
+
+  accountNumber: {
+    type: String,
+    required: true
+  },
+
+  ifscCode: {
+    type: String,
+    required: true
+  },
+
+  branchName: {
+    type: String
+  },
+
+  isDefault: {
+    type: Boolean,
+    default: false
+  },
+
+  isVerified: {
+    type: Boolean,
+    default: false
+  }
+
+},
+{ timestamps: true }
+);
 
 module.exports = mongoose.model("BankAccount", bankAccountSchema);

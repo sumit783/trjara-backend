@@ -4,42 +4,27 @@ const generateUniqueSlug = require("../../utils/slugify");
 // Create Category
 exports.createCategory = async (req, res) => {
     try {
-        const { shopId, title, oneLiner, sequence } = req.body;
+        const { name, parent, isActive } = req.body;
 
-        if (!title || !sequence || !shopId) {
+        if (!name) {
             return res.status(400).json({
                 success: false,
-                message: "title, shopId and sequence are required",
+                message: "name is required",
             });
         }
 
-        // Check sequence uniqueness per shop
-        const existingSeq = await Category.findOne({ sequence, shopId: shopId });
-        if (existingSeq) {
-            return res.status(400).json({
-                success: false,
-                message: `Sequence number ${sequence} is already in use for this shop`,
-            });
-        }
+        const slug = await generateUniqueSlug(name, Category);
 
-        const slug = await generateUniqueSlug(title, Category);
-
-        const verticalImageUrl = req.files?.["verticalImageUrl"]
-            ? `/uploads/${req.files["verticalImageUrl"][0].filename}`
-            : null;
-
-        const mainIconUrl = req.files?.["mainIconUrl"]
-            ? `/uploads/${req.files["mainIconUrl"][0].filename}`
+        const image = req.files?.["image"]
+            ? `/uploads/${req.files["image"][0].filename}`
             : null;
 
         const category = new Category({
-            shopId,
-            title,
+            name,
             slug,
-            verticalImageUrl,
-            mainIconUrl,
-            oneLiner,
-            sequence,
+            parent: parent || null,
+            image,
+            isActive: isActive !== undefined ? isActive : true,
         });
 
         const savedCategory = await category.save();
@@ -59,38 +44,23 @@ exports.createCategory = async (req, res) => {
 exports.updateCategory = async (req, res) => {
     try {
         const { categoryId } = req.params;
-        const { title, oneLiner, sequence, shopId } = req.body;
+        const { name, parent, isActive } = req.body;
 
         const category = await Category.findById(categoryId);
         if (!category) {
             return res.status(404).json({ success: false, message: "Category not found" });
         }
 
-        // Check if sequence is changing and ensure uniqueness
-        if (sequence && sequence !== category.sequence) {
-            const existingSeq = await Category.findOne({ sequence, shopId: shopId || category.shopId || null });
-            if (existingSeq) {
-                return res.status(400).json({
-                    success: false,
-                    message: `Sequence ${sequence} already exists for this shop`,
-                });
-            }
-            category.sequence = sequence;
+        if (name && name !== category.name) {
+            category.name = name;
+            category.slug = await generateUniqueSlug(name, Category);
         }
 
-        if (title && title !== category.title) {
-            category.title = title;
-            category.slug = await generateUniqueSlug(title, Category);
-        }
+        if (parent !== undefined) category.parent = parent || null;
+        if (isActive !== undefined) category.isActive = isActive;
 
-        if (oneLiner) category.oneLiner = oneLiner;
-
-        if (req.files?.["verticalImageUrl"]) {
-            category.verticalImageUrl = `/uploads/${req.files["verticalImageUrl"][0].filename}`;
-        }
-
-        if (req.files?.["mainIconUrl"]) {
-            category.mainIconUrl = `/uploads/${req.files["mainIconUrl"][0].filename}`;
+        if (req.files?.["image"]) {
+            category.image = `/uploads/${req.files["image"][0].filename}`;
         }
 
         const updated = await category.save();
@@ -111,6 +81,7 @@ exports.deleteCategory = async (req, res) => {
     try {
         const { categoryId } = req.params;
 
+        // Also potentially handle child categories here later if needed
         const deleted = await Category.findByIdAndDelete(categoryId);
         if (!deleted) {
             return res.status(404).json({ success: false, message: "Category not found" });
@@ -123,12 +94,16 @@ exports.deleteCategory = async (req, res) => {
     }
 };
 
-// Get all categories by shopId
-exports.getCategoriesByShop = async (req, res) => {
+// Get all categories (optionally nested or filtered by active status)
+exports.getCategories = async (req, res) => {
     try {
-        const { shopId } = req.params;
-
-        const categories = await Category.find({ shopId: shopId || null }).sort({ sequence: 1 });
+        const query = {};
+        if (req.query.active === 'true') query.isActive = true;
+        
+        // Populate parent for tree structures if necessary
+        const categories = await Category.find(query)
+            .populate('parent', 'name slug')
+            .sort({ createdAt: -1 });
 
         res.json({
             success: true,
@@ -141,12 +116,18 @@ exports.getCategoriesByShop = async (req, res) => {
     }
 };
 
-// Get single category by shopId + sequence
-exports.getCategoryBySequence = async (req, res) => {
+// Get single category by Slug or ID
+exports.getCategory = async (req, res) => {
     try {
-        const { shopId, sequence } = req.params;
+        const { identifier } = req.params;
 
-        const category = await Category.findOne({ shopId: shopId || null, sequence: Number(sequence) });
+        // Try to find by ID first, then fallback to slug
+        let category;
+        if (identifier.match(/^[0-9a-fA-F]{24}$/)) {
+            category = await Category.findById(identifier).populate('parent', 'name slug');
+        } else {
+            category = await Category.findOne({ slug: identifier }).populate('parent', 'name slug');
+        }
 
         if (!category) {
             return res.status(404).json({ success: false, message: "Category not found" });

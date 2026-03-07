@@ -1,29 +1,21 @@
 const mongoose = require("mongoose");
 
-const orderItemSchema = new mongoose.Schema(
-  {
-    orderId: { type: mongoose.Schema.Types.ObjectId, ref: "Order", required: true },
-    shopId: { type: mongoose.Schema.Types.ObjectId, ref: "Shop", required: true },
-    inventoryId: { type: mongoose.Schema.Types.ObjectId, ref: "Inventory", required: true },
+const orderItemSchema = new mongoose.Schema({
+  productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
+  inventoryId: { type: mongoose.Schema.Types.ObjectId, ref: "Inventory" },
 
-    qty: { type: Number, required: true },
-    unitPrice: { type: Number, required: true },
-    lineTotal: { type: Number, required: true },
+  name: String,
+  image: String,
 
-    shopItemStatus: {
-      type: String,
-      enum: [
-        "new",
-        "packed",
-        "rejected_at_rider",
-        "rejected_at_user",
-        "approved_by_user",
-        "approved_by_rider",
-      ],
-      default: "new",
-    },
+  variant: {
+    color: String,
+    size: String,
+    weight: String
   },
-  { timestamps: true }
-);
+
+  price: Number,
+  quantity: Number,
+  total: Number
+});
 
 module.exports = mongoose.model("OrderItem", orderItemSchema);

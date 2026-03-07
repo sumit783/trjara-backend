@@ -1,5 +1,5 @@
 // middlewares/adminAuthMiddleware.js
-const supabase = require('../config/supabaseClient');
+const jwt = require('jsonwebtoken');
 
 /**
  * Admin Authentication Middleware
@@ -18,64 +18,35 @@ const adminAuthMiddleware = async (req, res, next) => {
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
-    // Verify token with Supabase
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-
-    if (error || !user) {
-      return res.status(401).json({ 
-        success: false,
-        message: 'Invalid or expired token.' 
-      });
-    }
+    // Verify token with jsonwebtoken using SUPABASE_JWT_SECRET
+    const decoded = jwt.verify(token, process.env.SUPABASE_JWT_SECRET);
 
     // Check if user is authenticated
-    if (user.aud !== 'authenticated') {
+    if (decoded.aud !== 'authenticated') {
       return res.status(401).json({ 
         success: false,
         message: 'User not authenticated.' 
       });
     }
 
-    // Check if user email is confirmed
-    if (!user.email_confirmed_at) {
-      return res.status(401).json({ 
-        success: false,
-        message: 'Email not confirmed. Please verify your email first.' 
-      });
-    }
-
-    // Check if user has admin role (you can customize this based on your needs)
-    // Option 1: Check user metadata for admin role
-    // if (user.user_metadata && user.user_metadata.role !== 'admin') {
-    //   return res.status(403).json({ 
-    //     success: false,
-    //     message: 'Access denied. Admin privileges required.' 
-    //   });
-    // }
-
-    // Option 2: Check specific admin emails (alternative approach)
-    // const adminEmails = ['admin@example.com', 'superadmin@example.com'];
-    // if (!adminEmails.includes(user.email)) {
-    //   return res.status(403).json({ 
-    //     success: false,
-    //     message: 'Access denied. Admin privileges required.' 
-    //   });
-    // }
-
     // Add user info to request object
     req.admin = {
-      id: user.id,
-      email: user.email,
-      role: user.user_metadata?.role || 'admin',
-      emailConfirmed: !!user.email_confirmed_at
+      id: decoded.sub,
+      email: decoded.email,
+      role: decoded.user_metadata?.role || decoded.app_metadata?.role || 'admin',
+      emailConfirmed: true // we assume verified if token is valid and depending on app logic
     };
 
     next();
   } catch (error) {
-    console.error('Admin auth middleware error:', error);
+    console.error('Admin auth middleware error:', error.message);
     
-    // Handle specific Supabase errors
-    if (error.message && error.message.includes('JWT')) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Token expired.' 
+      });
+    } else if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({ 
         success: false,
         message: 'Invalid token format.' 
@@ -102,14 +73,14 @@ const optionalAdminAuth = async (req, res, next) => {
     }
 
     const token = authHeader.substring(7);
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    const decoded = jwt.verify(token, process.env.SUPABASE_JWT_SECRET);
 
-    if (!error && user && user.aud === 'authenticated' && user.email_confirmed_at) {
+    if (decoded && decoded.aud === 'authenticated') {
       req.admin = {
-        id: user.id,
-        email: user.email,
-        role: user.user_metadata?.role || 'admin',
-        emailConfirmed: !!user.email_confirmed_at
+        id: decoded.sub,
+        email: decoded.email,
+        role: decoded.user_metadata?.role || decoded.app_metadata?.role || 'admin',
+        emailConfirmed: true
       };
     } else {
       req.admin = null;

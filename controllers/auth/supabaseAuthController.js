@@ -1,7 +1,8 @@
 // controllers/auth/supabaseAuthController.js
-const supabase = require("../../config/supabaseClient");
+const { supabase, supabaseAdmin } = require("../../config/supabaseClient");
+const AnalyticsEvent = require("../../models/logs/AnalyticsEvent");
 
-// 📍 Admin Login (Supabase)
+// Admin Login (Supabase)
 exports.adminLogin = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -21,6 +22,12 @@ exports.adminLogin = async (req, res) => {
       access_token: session.access_token
     };
 
+    await AnalyticsEvent.create({
+      event: "admin_login",
+      properties: { email: user.email },
+      source: "admin"
+    });
+
     return res.json(response);
   } catch (err) {
     console.error("Error in adminLogin:", err);
@@ -33,6 +40,11 @@ exports.adminLogout = async (req, res) => {
   try {
     const { error } = await supabase.auth.signOut();
     if (error) return res.status(400).json({ error: error.message });
+
+    await AnalyticsEvent.create({
+      event: "admin_logout",
+      source: "admin"
+    });
 
     res.json({ message: "Admin logged out successfully" });
   } catch (err) {

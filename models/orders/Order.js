@@ -1,37 +1,56 @@
 const mongoose = require("mongoose");
 
 const orderSchema = new mongoose.Schema(
-  {
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    combinedStatus: {
+{
+  orderNumber: { type: String, unique: true },
+
+  customerId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  shopId: { type: mongoose.Schema.Types.ObjectId, ref: "Shop" },
+
+  items: [orderItemSchema],
+
+  pricing: {
+    subtotal: Number,
+    deliveryFee: Number,
+    discount: Number,
+    total: Number
+  },
+
+  payment: {
+    method: {
       type: String,
-      enum: [
-        "new",
-        "packed_partial",
-        "collecting",
-        "all_collected",
-        "out_for_delivery",
-        "delivered",
-        "cancelled",
-        "refunded",
-      ],
-      default: "new",
+      enum: ["COD", "ONLINE"]
     },
-    subtotal: { type: Number, required: true },
-    tax: { type: Number, default: 0 },
-    discount: { type: Number, default: 0 },
-    total: { type: Number, required: true },
-    paymentStatus: {
+    status: {
       type: String,
       enum: ["pending", "paid", "failed", "refunded"],
-      default: "pending",
-    },
-    paymentId: { type: mongoose.Schema.Types.ObjectId, ref: "Payment" },
-    deliveryId: { type: mongoose.Schema.Types.ObjectId, ref: "Delivery" },
-    shippingAddressId: { type: mongoose.Schema.Types.ObjectId, ref: "Address" },
+      default: "pending"
+    }
   },
-  { timestamps: true }
-);
 
+  status: {
+    type: String,
+    enum: [
+      "placed",
+      "accepted",
+      "packing",
+      "ready_for_pickup",
+      "picked",
+      "out_for_delivery",
+      "delivered",
+      "cancelled"
+    ],
+    default: "placed"
+  },
+
+  addressId: { type: mongoose.Schema.Types.ObjectId, ref: "Address" },
+
+  riderId: { type: mongoose.Schema.Types.ObjectId, ref: "Rider" },
+
+  placedAt: Date,
+  deliveredAt: Date
+},
+{ timestamps: true }
+);
 
 module.exports = mongoose.model("Order", orderSchema);

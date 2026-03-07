@@ -1,50 +1,86 @@
-const Shop = require("../../models/shops/Shop");
+const Shop = require("../../models/shops/Store");
+const User = require("../../models/users/User");
+const AnalyticsEvent = require("../../models/logs/AnalyticsEvent");
 
 exports.CreateVendorShop = async (req, res) => {
     try {
+        const owner = req.user._id;
+
         const {
-            ownerUserId,
             name,
-            type,
-            businessType,
             phone,
             email,
-            gstin,
-            pickupAddressId,
+            description,
+            address,
+            city,
+            state,
+            pincode,
+            category,
+            storeType,
+            businessType,
+            addharNumber,
+            addressNumber,
+            lng,
+            lat
         } = req.body;
 
         // Validation
-        if (!ownerUserId || !name || !type || !businessType) {
+        if (!owner || !name) {
             return res.status(400).json({
                 success: false,
-                message: "ownerUserId, name, type, and businessType are required",
+                message: "owner and name are required",
             });
         }
 
         // Get file paths from multer
-        const logoUrl = req.files["logoUrl"]
-            ? `/uploads/${req.files["logoUrl"][0].filename}`
+        const logo = req.files && req.files["logo"]
+            ? `/uploads/${req.files["logo"][0].filename}`
             : null;
 
-        const coverImageUrl = req.files["coverImageUrl"]
-            ? `/uploads/${req.files["coverImageUrl"][0].filename}`
+        const banner = req.files && req.files["banner"]
+            ? `/uploads/${req.files["banner"][0].filename}`
             : null;
+
+        // Construct location if provided
+        let location = undefined;
+        if (lng && lat) {
+            location = {
+                type: "Point",
+                coordinates: [parseFloat(lng), parseFloat(lat)]
+            };
+        }
 
         // Create shop
         const shop = new Shop({
-            ownerUserId,
+            owner,
             name,
-            type,
-            businessType,
             phone,
             email,
-            gstin,
-            pickupAddressId,
-            logoUrl,
-            coverImageUrl,
+            description,
+            address,
+            city,
+            state,
+            pincode,
+            storeType,
+            businessType,
+            category: category || undefined,
+            addressNumber,
+            addharNumber,
+            location,
+            logo,
+            banner,
         });
 
         const savedShop = await shop.save();
+        const user = await User.findById(owner);
+        user.role = "owner";
+        await user.save();
+
+        await AnalyticsEvent.create({
+            event: "shop_created",
+            properties: { shopId: savedShop._id, ownerId: owner },
+            source: req.headers["x-source"] || "web"
+        });
 
         res.status(201).json({
             success: true,
@@ -59,19 +95,24 @@ exports.CreateVendorShop = async (req, res) => {
     }
 };
 
-
-
 exports.EditVendorShop = async (req, res) => {
     try {
         const { shopId } = req.params;
         const {
             name,
-            type,
-            businessType,
             phone,
             email,
-            gstin,
-            pickupAddressId,
+            description,
+            address,
+            city,
+            state,
+            pincode,
+            category,
+            lng,
+            lat,
+            addharNumber,
+            isOpen,
+            isActive
         } = req.body;
 
         // Check if shop exists
@@ -84,26 +125,44 @@ exports.EditVendorShop = async (req, res) => {
         }
 
         // Handle file updates from multer
-        const logoUrl = req.files["logoUrl"]
-            ? `/uploads/${req.files["logoUrl"][0].filename}`
-            : shop.logoUrl;
+        const logo = req.files && req.files["logo"]
+            ? `/uploads/${req.files["logo"][0].filename}`
+            : shop.logo;
 
-        const coverImageUrl = req.files["coverImageUrl"]
-            ? `/uploads/${req.files["coverImageUrl"][0].filename}`
-            : shop.coverImageUrl;
+        const banner = req.files && req.files["banner"]
+            ? `/uploads/${req.files["banner"][0].filename}`
+            : shop.banner;
 
         // Update shop fields
-        shop.name = name || shop.name;
-        shop.type = type || shop.type;
-        shop.businessType = businessType || shop.businessType;
-        shop.phone = phone || shop.phone;
-        shop.email = email || shop.email;
-        shop.gstin = gstin || shop.gstin;
-        shop.pickupAddressId = pickupAddressId || shop.pickupAddressId;
-        shop.logoUrl = logoUrl;
-        shop.coverImageUrl = coverImageUrl;
+        if (name !== undefined) shop.name = name;
+        if (phone !== undefined) shop.phone = phone;
+        if (email !== undefined) shop.email = email;
+        if (description !== undefined) shop.description = description;
+        if (address !== undefined) shop.address = address;
+        if (city !== undefined) shop.city = city;
+        if (state !== undefined) shop.state = state;
+        if (pincode !== undefined) shop.pincode = pincode;
+        if (category !== undefined) shop.category = category;
+        if (isOpen !== undefined) shop.isOpen = isOpen;
+        if (isActive !== undefined) shop.isActive = isActive;
+        
+        if (lng !== undefined && lat !== undefined) {
+            shop.location = {
+                type: "Point",
+                coordinates: [parseFloat(lng), parseFloat(lat)]
+            };
+        }
+
+        shop.logo = logo;
+        shop.banner = banner;
 
         const updatedShop = await shop.save();
+
+        await AnalyticsEvent.create({
+            event: "shop_updated",
+            properties: { shopId: updatedShop._id, ownerId: updatedShop.owner },
+            source: req.headers["x-source"] || "web"
+        });
 
         res.status(200).json({
             success: true,
@@ -119,3 +178,4 @@ exports.EditVendorShop = async (req, res) => {
         });
     }
 };
+
