@@ -1,10 +1,10 @@
 const express = require("express");
 const upload = require("../../middlewares/upload");
-const { 
-    uploadDocument, 
-    showVendorDocuments, 
-    reUploadRejectedDocument, 
-    bulkVerifyDocuments 
+const {
+    uploadDocument,
+    showVendorDocuments,
+    reUploadRejectedDocument,
+    bulkVerifyDocuments
 } = require("../../controllers/shops/storeDocumentController");
 const rateLimitMiddleware = require("../../middlewares/rateLimitMiddleware");
 const loggerMiddleware = require("../../middlewares/loggerMiddleware");
@@ -16,37 +16,37 @@ const router = express.Router();
 // So we don't need to apply it again here unless we want it double checked.
 
 router.post(
-    "/upload", 
-    rateLimitMiddleware, 
-    loggerMiddleware, 
-    validateRequest, 
-    upload.single("document"), 
+    "/upload",
+    rateLimitMiddleware,
+    loggerMiddleware,
+    validateRequest,
+    upload.single("document"),
     uploadDocument
 );
 
 router.get(
-    "/store/:storeId", 
-    rateLimitMiddleware, 
-    loggerMiddleware, 
-    validateRequest, 
+    "/store/:storeId",
+    rateLimitMiddleware,
+    loggerMiddleware,
+    validateRequest,
     showVendorDocuments
 );
 
 router.put(
-    "/reupload/:docId", 
-    rateLimitMiddleware, 
-    loggerMiddleware, 
-    validateRequest, 
-    upload.single("document"), 
+    "/reupload/:docId",
+    rateLimitMiddleware,
+    loggerMiddleware,
+    validateRequest,
+    upload.single("document"),
     reUploadRejectedDocument
 );
 
 router.patch(
-    "/verify", 
+    "/verify",
     rateLimitMiddleware,
-    adminAuthMiddleware, 
-    loggerMiddleware, 
-    validateRequest, 
+    adminAuthMiddleware,
+    loggerMiddleware,
+    validateRequest,
     bulkVerifyDocuments
 );
 

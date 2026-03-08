@@ -9,6 +9,7 @@ const shopsRoutes = require("./routes/shops/Shop.js");
 const productsRoutes = require("./routes/shops/productRoutes.js");
 // const addressRoutes = require("./routes/users/addressRoutes.js");
 const categoriesRoutes = require("./routes/shops/categoriesRoutes.js");
+const customerRoutes = require("./routes/users/customerRoutes");
 // const userLists = require("./routes/users/usersLists.js");
 const errorHandler = require("./middlewares/errorHandler");
 const authMiddleware = require("./middlewares/authMiddleware.js");
@@ -36,6 +37,7 @@ app.use("/api/shops", shopsRoutes);
 app.use("/api/products", productsRoutes);
 // app.use("/api/addresses", addressRoutes);
 app.use("/api/categories", categoriesRoutes);
+app.use("/api/customer", customerRoutes);
 // app.use('/api/users', userLists)
 
 app.use(errorHandler);

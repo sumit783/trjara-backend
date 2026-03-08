@@ -2,6 +2,7 @@ const Product = require("../../models/shops/Product");
 const VariantOption = require("../../models/shops/VariantOption");
 const ProductVariant = require("../../models/shops/ProductVariant");
 const Inventory = require("../../models/shops/Inventory");
+const InventoryLog = require("../../models/shops/InventoryLog");
 const QRCode = require("../../models/shops/QRCode");
 const generateUniqueSlug = require("../../utils/slugify");
 const crypto = require("crypto");
@@ -208,12 +209,22 @@ exports.addInventory = async (req, res) => {
             });
 
             const savedInv = await inventory.save();
+
+            // Log the inventory addition
+            await InventoryLog.create({
+                inventory: savedInv._id,
+                changeType: "add",
+                quantity: item.stock || 0,
+                reason: "Initial stock addition",
+                staff: req.user._id
+            });
+
             createdInventories.push(savedInv);
         }
 
         res.status(201).json({
             success: true,
-            message: "Inventory records created successfully",
+            message: "Inventory records created and logged successfully",
             count: createdInventories.length,
             data: createdInventories
         });
@@ -258,6 +269,80 @@ exports.generateQRCodes = async (req, res) => {
 
     } catch (error) {
         console.error("Error generating QR codes:", error);
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+// 6. Update Inventory Stock
+exports.updateInventoryStock = async (req, res) => {
+    try {
+        const { inventoryId } = req.params;
+        const { stock, reason, changeType } = req.body; // changeType: "add", "remove", "adjust"
+
+        const inventory = await Inventory.findById(inventoryId);
+        if (!inventory) {
+            return res.status(404).json({ success: false, message: "Inventory record not found" });
+        }
+
+        if (changeType === "add") {
+            inventory.stock += stock;
+        } else if (changeType === "remove") {
+            inventory.stock -= stock;
+        } else {
+            inventory.stock = stock; // adjust/set
+        }
+
+        const updatedInv = await inventory.save();
+
+        // Log the change
+        await InventoryLog.create({
+            inventory: inventoryId,
+            changeType: changeType || "adjust",
+            quantity: changeType === "adjust" ? stock : stock, // we log the change amount or final amount? Typically change amount.
+            reason: reason || "Stock update",
+            staff: req.user._id
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Inventory updated and logged successfully",
+            data: updatedInv
+        });
+
+    } catch (error) {
+        console.error("Error updating inventory:", error);
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+// 7. Delete Inventory
+exports.deleteInventory = async (req, res) => {
+    try {
+        const { inventoryId } = req.params;
+
+        const inventory = await Inventory.findById(inventoryId);
+        if (!inventory) {
+            return res.status(404).json({ success: false, message: "Inventory record not found" });
+        }
+
+        // Log the deletion before actually deleting
+        await InventoryLog.create({
+            inventory: inventoryId,
+            changeType: "remove",
+            quantity: -inventory.stock,
+            reason: "Inventory record deleted",
+            staff: req.user._id
+        });
+
+        await Inventory.findByIdAndDelete(inventoryId);
+
+        res.status(200).json({
+            success: true,
+            message: "Inventory record deleted and logged successfully"
+        });
+
+    } catch (error) {
+        console.error("Error deleting inventory:", error);
         res.status(500).json({ success: false, message: "Server error", error: error.message });
     }
 };

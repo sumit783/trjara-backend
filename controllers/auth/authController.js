@@ -57,13 +57,13 @@ exports.createAccount = async (req, res) => {
       return res.status(400).json({ error: "User already exists with this phone number." });
     }
 
-    user = new User({ 
-      phone, 
-      role: role || "guest", 
+    user = new User({
+      phone,
+      role: role || "guest",
       name,
       email,
       profileImageUrl,
-      verified: false 
+      verified: false
     });
 
     let otp = "1234";
@@ -74,7 +74,7 @@ exports.createAccount = async (req, res) => {
     user.otp = otp;
     user.otpExpiry = new Date(Date.now() + OTP_EXPIRY);
     await user.save();
-    if(user.role === "customer"){
+    if (user.role === "customer") {
       user.isAdminVerified = "verified";
       await user.save();
     }
@@ -150,7 +150,7 @@ exports.verifyOtp = async (req, res) => {
       staffData = await Staff.findOne({ userId: user._id, active: true })
         .populate("roleId", "name permissions")
         .populate("shopId", "name");
-      
+
       if (!staffData) {
         return res.status(403).json({ error: "Staff record not found or inactive" });
       }
@@ -164,12 +164,12 @@ exports.verifyOtp = async (req, res) => {
     }
 
     // Create JWT token with additional staff info if applicable
-    const tokenPayload = { 
-      id: user._id, 
+    const tokenPayload = {
+      id: user._id,
       role: user.role,
-      ...(staffData && { 
-        staffId: staffData._id, 
-        shopId: staffData.shopId._id 
+      ...(staffData && {
+        staffId: staffData._id,
+        shopId: staffData.shopId._id
       })
     };
     const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
@@ -278,6 +278,46 @@ exports.logout = async (req, res) => {
     res.json({ message: "Logged out successfully" });
   } catch (err) {
     console.error("Error in logout:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+// Step 4: Create Guest User
+exports.createGuestUser = async (req, res) => {
+  try {
+    const user = new User({
+      role: "guest",
+      verified: false
+    });
+
+    await user.save();
+
+    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET);
+
+    // Save session
+    const session = new Session({
+      userId: user._id,
+      deviceInfo: req.headers["user-agent"] || "unknown",
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
+
+    await session.save();
+
+    await AnalyticsEvent.create({
+      event: "guest_user_created",
+      userId: user._id,
+      source: req.headers["x-source"] || "web"
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Guest user created successfully",
+      token,
+      user,
+      sessionId: session._id
+    });
+  } catch (err) {
+    console.error("Error in createGuestUser:", err);
     res.status(500).json({ error: "Server error" });
   }
 };

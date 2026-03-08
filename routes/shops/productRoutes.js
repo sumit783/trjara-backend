@@ -5,7 +5,9 @@ const {
     addVariantOptions,
     generateVariants,
     addInventory,
-    generateQRCodes
+    generateQRCodes,
+    updateInventoryStock,
+    deleteInventory
 } = require("../../controllers/shops/productController");
 const authMiddleware = require("../../middlewares/authMiddleware");
 
@@ -26,5 +28,11 @@ router.post("/:productId/inventory", authMiddleware, addInventory);
 
 // 5. Generate QR Code - Note this is an inventory operation, mapped globally or under product
 router.post("/inventory/qrcodes/generate", authMiddleware, generateQRCodes);
+
+// 6. Update Inventory Stock
+router.put("/inventory/:inventoryId", authMiddleware, updateInventoryStock);
+
+// 7. Delete Inventory
+router.delete("/inventory/:inventoryId", authMiddleware, deleteInventory);
 
 module.exports = router;
