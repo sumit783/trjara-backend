@@ -1,24 +1,30 @@
 const express = require("express");
 const upload = require("../../middlewares/upload");
-const { createProduct, getProducts, getProductById, updateProduct, deleteProduct } = require("../../controllers/shops/productController");
+const {
+    createProduct,
+    addVariantOptions,
+    generateVariants,
+    addInventory,
+    generateQRCodes
+} = require("../../controllers/shops/productController");
+const authMiddleware = require("../../middlewares/authMiddleware");
 
 const router = express.Router();
 
-router.post(
-    "/",
-    upload.fields([{ name: "thumbnailUrl", maxCount: 1 }, { name: "imageUrls", maxCount: 5 }]),
-    createProduct
-);
+// 1. Create Base Product
+// Uses upload.fields to accept multiple images under the "images" key
+router.post("/", authMiddleware, upload.fields([{ name: "images", maxCount: 5 }]), createProduct);
 
-router.get("/", getProducts);
-router.get("/:id", getProductById);
+// 2. Add Variant Options
+router.post("/:productId/options", authMiddleware, addVariantOptions);
 
-router.put(
-    "/:id",
-    upload.fields([{ name: "thumbnailUrl", maxCount: 1 }, { name: "imageUrls", maxCount: 5 }]),
-    updateProduct
-);
+// 3. Generate Variants
+router.post("/:productId/variants/generate", authMiddleware, generateVariants);
 
-router.delete("/:id", deleteProduct);
+// 4. Add Price & Stock (Inventory)
+router.post("/:productId/inventory", authMiddleware, addInventory);
+
+// 5. Generate QR Code - Note this is an inventory operation, mapped globally or under product
+router.post("/inventory/qrcodes/generate", authMiddleware, generateQRCodes);
 
 module.exports = router;

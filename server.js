@@ -3,10 +3,10 @@ const dotenv = require("dotenv");
 const connectDB = require("./config/db.js");
 const userAuthRoutes = require("./routes/auth/userAuthRoutes");
 const adminAuthRoutes = require("./routes/auth/adminAuthRoutes");
-// const adminRoutes = require("./routes/admin/adminRoutes");
+const adminRoutes = require("./routes/admin/adminRoutes");
 // const documentRoutes = require("./routes/documentRouter/documentRoutes");
 const shopsRoutes = require("./routes/shops/Shop.js");
-// const productsRoutes = require("./routes/shops/productRoutes.js");
+const productsRoutes = require("./routes/shops/productRoutes.js");
 // const addressRoutes = require("./routes/users/addressRoutes.js");
 const categoriesRoutes = require("./routes/shops/categoriesRoutes.js");
 // const userLists = require("./routes/users/usersLists.js");
@@ -30,10 +30,10 @@ app.get("/", (req, res) => {
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/api/auth/user", userAuthRoutes);
 app.use("/api/auth/admin", adminAuthRoutes);
-// app.use("/api/admin", adminRoutes);
+app.use("/api/admin", adminRoutes);
 // app.use("/api/documents", authMiddleware, documentRoutes);
-app.use("/api/shops", authMiddleware, shopsRoutes);
-// app.use("/api/products", authMiddleware, productsRoutes);
+app.use("/api/shops", shopsRoutes);
+app.use("/api/products", productsRoutes);
 // app.use("/api/addresses", addressRoutes);
 app.use("/api/categories", categoriesRoutes);
 // app.use('/api/users', userLists)

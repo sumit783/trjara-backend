@@ -21,7 +21,12 @@ const storeDocumentSchema = new mongoose.Schema(
     type: String,
     enum: ["pending","verified","rejected","reuploaded"],
     default: "pending"
-  }
+  },
+
+  reason: {
+    type: String,
+    default: null
+  },
 
 },
 { timestamps: true }

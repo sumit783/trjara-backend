@@ -19,7 +19,6 @@ exports.CreateVendorShop = async (req, res) => {
             storeType,
             businessType,
             addharNumber,
-            addressNumber,
             lng,
             lat
         } = req.body;
@@ -64,7 +63,6 @@ exports.CreateVendorShop = async (req, res) => {
             storeType,
             businessType,
             category: category || undefined,
-            addressNumber,
             addharNumber,
             location,
             logo,
@@ -74,6 +72,8 @@ exports.CreateVendorShop = async (req, res) => {
         const savedShop = await shop.save();
         const user = await User.findById(owner);
         user.role = "owner";
+        user.isActive = false;
+        user.isAdminVerified = "pending";
         await user.save();
 
         await AnalyticsEvent.create({
@@ -108,11 +108,11 @@ exports.EditVendorShop = async (req, res) => {
             state,
             pincode,
             category,
-            lng,
-            lat,
+            storeType,
+            businessType,
             addharNumber,
-            isOpen,
-            isActive
+            lng,
+            lat
         } = req.body;
 
         // Check if shop exists
@@ -143,9 +143,10 @@ exports.EditVendorShop = async (req, res) => {
         if (state !== undefined) shop.state = state;
         if (pincode !== undefined) shop.pincode = pincode;
         if (category !== undefined) shop.category = category;
-        if (isOpen !== undefined) shop.isOpen = isOpen;
-        if (isActive !== undefined) shop.isActive = isActive;
-        
+        if (storeType !== undefined) shop.storeType = storeType;
+        if (businessType !== undefined) shop.businessType = businessType;
+        if (addharNumber !== undefined) shop.addharNumber = addharNumber;
+
         if (lng !== undefined && lat !== undefined) {
             shop.location = {
                 type: "Point",
@@ -155,7 +156,10 @@ exports.EditVendorShop = async (req, res) => {
 
         shop.logo = logo;
         shop.banner = banner;
-
+        if (shop.adminVerificationStatus === "rejected") {
+            shop.adminVerificationStatus = "reuploaded";
+            shop.isActive = false;
+        }
         const updatedShop = await shop.save();
 
         await AnalyticsEvent.create({
@@ -179,3 +183,81 @@ exports.EditVendorShop = async (req, res) => {
     }
 };
 
+exports.getAllStores = async (req, res) => {
+    try {
+        const stores = await Shop.find()
+            .populate("owner", "name email phone")
+            .populate("category", "name slug")
+            .sort({ createdAt: -1 });
+
+        res.status(200).json({
+            success: true,
+            message: "Stores fetched successfully",
+            count: stores.length,
+            data: stores,
+        });
+    } catch (error) {
+        console.error("Error fetching stores:", error);
+        res.status(500).json({
+            success: false,
+            message: "Server error",
+            error: error.message,
+        });
+    }
+};
+
+exports.verifyStore = async (req, res) => {
+    try {
+        const { storeId } = req.params;
+        const { status, reason } = req.body;
+
+        const validStatuses = ["pending", "verified", "rejected", "reuploaded"];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({
+                success: false,
+                message: `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
+            });
+        }
+
+        const store = await Shop.findById(storeId);
+        if (!store) {
+            return res.status(404).json({
+                success: false,
+                message: "Store not found",
+            });
+        }
+
+        store.adminVerificationStatus = status;
+        if (status === "rejected" && reason) {
+            store.adminVerificationReason = reason;
+        } else if (status !== "rejected") {
+            store.adminVerificationReason = undefined;
+        }
+
+        const updatedStore = await store.save();
+
+        await AnalyticsEvent.create({
+            event: "store_verification_updated",
+            properties: {
+                shopId: updatedStore._id,
+                ownerId: updatedStore.owner,
+                status,
+                reason: status === "rejected" ? reason : undefined
+            },
+            source: "admin"
+        });
+
+        res.status(200).json({
+            success: true,
+            message: `Store verification status updated to ${status}`,
+            data: updatedStore,
+        });
+    } catch (error) {
+        console.error("Error verifying store:", error);
+        res.status(500).json({
+            success: false,
+            message: "Server error",
+            error: error.message,
+        });
+    }
+};

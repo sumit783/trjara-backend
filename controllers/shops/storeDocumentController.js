@@ -75,19 +75,19 @@ exports.reUploadRejectedDocument = async (req, res) => {
         }
 
         storeDoc.documentUrl = `/uploads/${req.file.filename}`;
-        if(storeDoc.verificationStatus === "rejected"){
+        if (storeDoc.verificationStatus === "rejected") {
             storeDoc.verificationStatus = "reuploaded";
-        }else{
+        } else {
             storeDoc.verificationStatus = "pending";
         }
-        
+
         await storeDoc.save();
 
         await AnalyticsEvent.create({
             event: "document_reuploaded",
-            properties: { 
-                storeId: storeDoc.store, 
-                documentType: storeDoc.documentType, 
+            properties: {
+                storeId: storeDoc.store,
+                documentType: storeDoc.documentType,
                 docId
             },
             source: req.headers["x-source"] || "web"
@@ -134,24 +134,27 @@ exports.bulkVerifyDocuments = async (req, res) => {
         }
 
         const updatedDocs = [];
+        const affectedStoreIds = new Set();
 
         for (const v of verifications) {
-            const { docId, status } = v;
+            const { docId, status, reason } = v;
             if (["verified", "rejected"].includes(status)) {
                 const doc = await StoreDocument.findByIdAndUpdate(
-                    docId, 
-                    { verificationStatus: status },
+                    docId,
+                    { verificationStatus: status, reason: reason ? reason : null },
                     { new: true }
                 );
                 if (doc) {
                     updatedDocs.push(doc);
+                    affectedStoreIds.add(doc.store.toString());
                     await AnalyticsEvent.create({
                         event: "document_verified",
-                        properties: { 
-                            storeId: doc.store, 
-                            documentType: doc.documentType, 
-                            docId, 
-                            status 
+                        properties: {
+                            storeId: doc.store,
+                            documentType: doc.documentType,
+                            docId,
+                            status,
+                            reason: reason ? reason : null
                         },
                         source: "admin"
                     });
@@ -159,9 +162,48 @@ exports.bulkVerifyDocuments = async (req, res) => {
             }
         }
 
+        // Update Store status for each affected store
+        for (const storeId of affectedStoreIds) {
+            const storeDocs = await StoreDocument.find({ store: storeId });
+            const store = await Store.findById(storeId);
+
+            if (!store) continue;
+
+            const requiredDocs = ["gst", "shop_license"];
+            const verifiedDocs = storeDocs.filter(d => d.verificationStatus === "verified").map(d => d.documentType);
+            const rejectedDocs = storeDocs.filter(d => d.verificationStatus === "rejected");
+
+            const anyRequiredVerified = requiredDocs.some(type => verifiedDocs.includes(type));
+            const hasRejected = rejectedDocs.length > 0;
+
+            if (anyRequiredVerified) {
+                store.isActive = true;
+                store.adminVerificationReason = null;
+            } else if (hasRejected) {
+                store.isActive = false;
+                // Optionally set reason from the first rejected document if not already set
+                if (!store.adminVerificationReason && rejectedDocs[0].reason) {
+                    store.adminVerificationReason = rejectedDocs[0].reason;
+                }
+            } else {
+                store.isActive = false;
+            }
+
+            await store.save();
+
+            await AnalyticsEvent.create({
+                event: "store_auto_activation_updated",
+                properties: {
+                    storeId,
+                    isActive: store.isActive,
+                },
+                source: "system"
+            });
+        }
+
         res.status(200).json({
             success: true,
-            message: "Documents verified successfully",
+            message: "Documents verified and store statuses updated successfully",
             data: updatedDocs
         });
 

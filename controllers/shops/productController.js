@@ -1,173 +1,263 @@
-const Inventory = require("../../models/shops/Inventory");
 const Product = require("../../models/shops/Product");
-const InventoryVariant = require("../../models/shops/InventoryVariant");
+const VariantOption = require("../../models/shops/VariantOption");
+const ProductVariant = require("../../models/shops/ProductVariant");
+const Inventory = require("../../models/shops/Inventory");
+const QRCode = require("../../models/shops/QRCode");
 const generateUniqueSlug = require("../../utils/slugify");
+const crypto = require("crypto");
 
-// -------------------- CREATE --------------------
+// 1. Create Base Product
 exports.createProduct = async (req, res) => {
     try {
-        const { shopId, categoryId, title, description } = req.body;
+        const { name, description, brand, category, isActive } = req.body;
 
-        if (!shopId || !title) {
-            return res.status(400).json({ success: false, message: "shopId and title are required" });
+        if (!name || !category) {
+            return res.status(400).json({ success: false, message: "name and category are required" });
         }
 
-        const slug = await generateUniqueSlug(title, Product);
+        const images = [];
+        if (req.files && req.files["images"]) {
+            for (const file of req.files["images"]) {
+                images.push(`/uploads/${file.filename}`);
+            }
+        }
 
         const product = new Product({
-            shopId,
-            categoryId,
-            title,
-            slug,
+            name,
             description,
-            thumbnailUrl: req.files?.thumbnailUrl
-                ? `/uploads/${req.files.thumbnailUrl[0].filename}`
-                : null,
-            imageUrls: req.files?.imageUrls
-                ? req.files.imageUrls.map((f) => `/uploads/${f.filename}`)
-                : [],
+            brand,
+            category,
+            images,
+            isActive: isActive !== undefined ? isActive : true
         });
 
         const savedProduct = await product.save();
-        res.status(201).json({ success: true, message: "Product created", data: savedProduct });
-    } catch (error) {
-        console.error("Create product error:", error);
-        res.status(500).json({ success: false, message: "Server error", error: error.message });
-    }
-};
 
-// -------------------- READ (ALL with filters) --------------------
-exports.getProducts = async (req, res) => {
-    try {
-        const { shopId, categoryId, search, isActive, page = 1, limit = 10 } = req.query;
-        const query = {};
-
-        if (shopId) query.shopId = shopId;
-        if (categoryId) query.categoryId = categoryId;
-        if (isActive !== undefined) query.isActive = isActive === "true";
-
-        if (search) {
-            query.$or = [
-                { title: new RegExp(search, "i") },
-                { description: new RegExp(search, "i") },
-            ];
-        }
-
-        const skip = (parseInt(page) - 1) * parseInt(limit);
-
-        const total = await Product.countDocuments(query);
-        const products = await Product.find(query)
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(parseInt(limit));
-
-        res.json({
+        res.status(201).json({
             success: true,
-            page: parseInt(page),
-            limit: parseInt(limit),
-            total,
-            totalPages: Math.ceil(total / limit),
-            count: products.length,
-            data: products,
+            message: "Product base created successfully",
+            data: savedProduct
         });
+
     } catch (error) {
-        console.error("Get products error:", error);
+        console.error("Error creating product:", error);
         res.status(500).json({ success: false, message: "Server error", error: error.message });
     }
 };
 
-// -------------------- READ (SINGLE) --------------------
-exports.getProductById = async (req, res) => {
+// 2. Add Variant Options
+exports.addVariantOptions = async (req, res) => {
     try {
-        const productId = req.params.id;
+        const { productId } = req.params;
+        const { options } = req.body; // Array of { name: 'Size', values: ['S', 'M', 'L'] }
 
-        const product = await Product.findById(productId)
-            .populate("shopId", "name type")
-            .populate("categoryId", "title slug");
-
-        if (!product) {
-            return res
-                .status(404)
-                .json({ success: false, message: "Product not found" });
+        if (!options || !Array.isArray(options)) {
+            return res.status(400).json({ success: false, message: "options array is required" });
         }
 
-        // 1️⃣ Get all inventories for this product
-        const inventories = await Inventory.find({ productId });
+        const product = await Product.findById(productId);
+        if (!product) {
+            return res.status(404).json({ success: false, message: "Product not found" });
+        }
 
-        // 2️⃣ For each inventory, fetch variants
-        const inventoryWithVariants = await Promise.all(
-            inventories.map(async (inv) => {
-                const variants = await InventoryVariant.find({ inventoryId: inv._id })
-                    .populate("variantOptionId", "name values"); // link to VariantOption
+        const savedOptions = [];
+        for (const opt of options) {
+            const newOption = new VariantOption({
+                name: opt.name,
+                values: opt.values
+            });
+            const savedOption = await newOption.save();
+            savedOptions.push(savedOption._id);
+        }
 
-                return {
-                    ...inv.toObject(),
-                    variants,
-                };
-            })
-        );
+        // Link options to product
+        product.options = [...(product.options || []), ...savedOptions];
+        await product.save();
 
-        res.json({
+        // Automatically sync variants as requested by the user
+        const createdVariants = await syncProductVariants(productId);
+
+        res.status(201).json({
             success: true,
+            message: "Variant options added and variants generated",
             data: {
-                product,
-                inventories: inventoryWithVariants,
-            },
+                options: savedOptions,
+                variants: createdVariants
+            }
         });
     } catch (error) {
-        console.error("Get product error:", error);
-        res.status(500).json({
-            success: false,
-            message: "Server error",
-            error: error.message,
-        });
-    }
-};
-
-
-// -------------------- UPDATE --------------------
-exports.updateProduct = async (req, res) => {
-    try {
-        const { title, description, categoryId, isActive } = req.body;
-
-        const product = await Product.findById(req.params.id);
-        if (!product) {
-            return res.status(404).json({ success: false, message: "Product not found" });
-        }
-
-        if (title) {
-            product.title = title;
-            product.slug = await generateUniqueSlug(title, Product, product._id);
-        }
-        if (description) product.description = description;
-        if (categoryId) product.categoryId = categoryId;
-        if (isActive !== undefined) product.isActive = isActive;
-
-        if (req.files?.thumbnailUrl) {
-            product.thumbnailUrl = `/uploads/${req.files.thumbnailUrl[0].filename}`;
-        }
-        if (req.files?.imageUrls) {
-            product.imageUrls = req.files.imageUrls.map((f) => `/uploads/${f.filename}`);
-        }
-
-        const updated = await product.save();
-        res.json({ success: true, message: "Product updated", data: updated });
-    } catch (error) {
-        console.error("Update product error:", error);
+        console.error("Error adding variant options:", error);
         res.status(500).json({ success: false, message: "Server error", error: error.message });
     }
 };
 
-// -------------------- DELETE --------------------
-exports.deleteProduct = async (req, res) => {
+// Helper function to sync/generate variants for a product
+const syncProductVariants = async (productId) => {
+    const product = await Product.findById(productId).populate("options");
+    if (!product) throw new Error("Product not found");
+
+    if (!product.options || product.options.length === 0) {
+        return [];
+    }
+
+    // Helper to generate Cartesian product of arrays
+    const cartesianProduct = (arrays) => {
+        return arrays.reduce((acc, curr) =>
+            acc.flatMap(c => curr.map(n => [...c, n])),
+            [[]]
+        );
+    };
+
+    const optionNames = product.options.map(o => o.name);
+    const optionValuesList = product.options.map(o => o.values);
+
+    const combinations = cartesianProduct(optionValuesList);
+
+    const createdVariants = [];
+
+    // Clear existing variants from the collection for this product to avoid duplicates
+    // Note: In a production app, you might want to preserve some data (like old SKUs or images)
+    await ProductVariant.deleteMany({ product: productId });
+
+    for (const combo of combinations) {
+        const optionsMap = new Map();
+        for (let i = 0; i < optionNames.length; i++) {
+            optionsMap.set(optionNames[i], combo[i]);
+        }
+
+        const skuSuffix = combo.map(v => v.substring(0, 3).toUpperCase()).join('-');
+        const sku = `PRD-${productId.substring(18, 24)}-${skuSuffix}-${Date.now().toString().slice(-4)}`;
+
+        const variant = new ProductVariant({
+            product: productId,
+            options: optionsMap,
+            sku: sku
+        });
+
+        const savedVariant = await variant.save();
+        createdVariants.push(savedVariant);
+    }
+
+    // Link variants to product
+    product.productVariant = createdVariants.map(v => v._id);
+    await product.save();
+
+    return createdVariants;
+};
+
+// 3. Generate Variants
+exports.generateVariants = async (req, res) => {
     try {
-        const deleted = await Product.findByIdAndDelete(req.params.id);
-        if (!deleted) {
+        const { productId } = req.params;
+        const createdVariants = await syncProductVariants(productId);
+
+        res.status(201).json({
+            success: true,
+            message: "Product variants generated and linked successfully",
+            count: createdVariants.length,
+            data: createdVariants
+        });
+
+    } catch (error) {
+        console.error("Error generating variants:", error);
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+// 4. Add Price & Stock (Inventory)
+exports.addInventory = async (req, res) => {
+    try {
+        const { productId } = req.params;
+        const { storeId, inventoryData } = req.body;
+        // inventoryData = [{ variantId, price, mrp, stock }, ...]
+
+        if (!storeId || !inventoryData || !Array.isArray(inventoryData)) {
+            return res.status(400).json({ success: false, message: "storeId and inventoryData array are required" });
+        }
+
+        const product = await Product.findById(productId);
+        if (!product) {
             return res.status(404).json({ success: false, message: "Product not found" });
         }
-        res.json({ success: true, message: "Product deleted" });
+
+        const createdInventories = [];
+
+        for (const item of inventoryData) {
+            let variantOptions = null;
+            let sku = null;
+
+            if (item.variantId) {
+                const variant = await ProductVariant.findById(item.variantId);
+                if (variant) {
+                    variantOptions = variant.options;
+                    sku = variant.sku;
+                }
+            }
+
+            const inventory = new Inventory({
+                store: storeId,
+                product: productId,
+                variant: item.variantId || null,
+                productName: product.name,
+                productImages: product.images,
+                variantOptions: variantOptions,
+                sku: sku || item.sku,
+                price: item.price,
+                mrp: item.mrp || item.price,
+                stock: item.stock || 0
+            });
+
+            const savedInv = await inventory.save();
+            createdInventories.push(savedInv);
+        }
+
+        res.status(201).json({
+            success: true,
+            message: "Inventory records created successfully",
+            count: createdInventories.length,
+            data: createdInventories
+        });
+
     } catch (error) {
-        console.error("Delete product error:", error);
+        console.error("Error adding inventory:", error);
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+// 5. Generate QR Code
+exports.generateQRCodes = async (req, res) => {
+    try {
+        // Accept an array of inventory IDs
+        const { inventoryIds, storeId } = req.body;
+
+        if (!inventoryIds || !Array.isArray(inventoryIds) || !storeId) {
+            return res.status(400).json({ success: false, message: "inventoryIds array and storeId are required" });
+        }
+
+        const createdQRs = [];
+
+        for (const invId of inventoryIds) {
+            const code = crypto.randomBytes(8).toString('hex').toUpperCase();
+
+            const qrCode = new QRCode({
+                code: `QR-${code}`,
+                inventory: invId,
+                store: storeId
+            });
+
+            const savedQR = await qrCode.save();
+            createdQRs.push(savedQR);
+        }
+
+        res.status(201).json({
+            success: true,
+            message: "QR Codes generated successfully",
+            count: createdQRs.length,
+            data: createdQRs
+        });
+
+    } catch (error) {
+        console.error("Error generating QR codes:", error);
         res.status(500).json({ success: false, message: "Server error", error: error.message });
     }
 };
