@@ -1,11 +1,16 @@
 const express = require("express");
 const upload = require("../../middlewares/upload");
 const { CreateVendorShop, EditVendorShop } = require("../../controllers/shops/Shop");
+const { getStoreTiming, saveStoreTiming } = require("../../controllers/shops/storeTimingController");
 const staffRoutes = require("./staffRoutes");
 const storeDocumentRoutes = require("./storeDocumentRoutes");
 const authMiddleware = require("../../middlewares/authMiddleware");
 
 const router = express.Router();
+
+// Store Timing routes
+router.get("/:shopId/timing", authMiddleware, getStoreTiming);
+router.post("/:shopId/timing", authMiddleware, saveStoreTiming);
 
 // For multiple files
 router.post(

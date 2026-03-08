@@ -2,17 +2,21 @@ const Role = require("../../models/shops/ShopRole");
 
 exports.createRole = async (req, res) => {
   try {
-    const { name, permissions } = req.body;
-    if (!name) {
-      return res.status(400).json({ error: "name is required" });
+    const { name, permissions, shopId } = req.body;
+    if (!name || !shopId) {
+      return res.status(400).json({ error: "name and shopId are required" });
     }
 
-    const existing = await Role.findOne({ name });
+    const existing = await Role.findOne({ name, store: shopId });
     if (existing) {
-      return res.status(409).json({ error: "Role with this name already exists" });
+      return res.status(409).json({ error: "Role with this name already exists for this store" });
     }
 
-    const role = await Role.create({ name, permissions: permissions || {} });
+    const role = await Role.create({
+      name,
+      store: shopId,
+      permissions: permissions || {}
+    });
     res.status(201).json(role);
   } catch (err) {
     console.error("Error creating role:", err);
@@ -22,7 +26,9 @@ exports.createRole = async (req, res) => {
 
 exports.getRoles = async (req, res) => {
   try {
-    const roles = await Role.find({}).sort({ createdAt: -1 });
+    const { shopId } = req.query;
+    const filter = shopId ? { store: shopId } : {};
+    const roles = await Role.find(filter).sort({ createdAt: -1 });
     res.json(roles);
   } catch (err) {
     console.error("Error fetching roles:", err);
