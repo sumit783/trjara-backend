@@ -1,4 +1,4 @@
-const StoreDocument = require("../../models/shops/storeDocument");
+const StoreDocument = require("../../models/shops/StoreDocument");
 const Store = require("../../models/shops/Store");
 const AnalyticsEvent = require("../../models/logs/AnalyticsEvent");
 
