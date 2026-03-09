@@ -29,11 +29,7 @@ const riderDocumentSchema = new mongoose.Schema(
     enum: ["pending", "approved", "rejected","reuploaded"],
     default: "pending"
   },
-
-  verifiedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User"
-  },
+  
   remark: {
     type: String
   },
