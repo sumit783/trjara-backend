@@ -10,17 +10,47 @@ const productsRoutes = require("./routes/shops/productRoutes.js");
 // const addressRoutes = require("./routes/users/addressRoutes.js");
 const categoriesRoutes = require("./routes/shops/categoriesRoutes.js");
 const customerRoutes = require("./routes/users/customerRoutes");
-// const userLists = require("./routes/users/usersLists.js");
+const riderRoutes = require("./routes/auth/delivery/riderRoutes.js");
 const errorHandler = require("./middlewares/errorHandler");
 const authMiddleware = require("./middlewares/authMiddleware.js");
 const path = require("path");
+const cors = require("cors");
+
+const http = require("http");
+const { Server } = require("socket.io");
+const { scheduleLocationUpdate } = require("./utils/socketHandler");
 
 dotenv.config();
 
 const app = express();
+const server = http.createServer(app);
+
+// Configure CORS
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",")
+  : "*";
+
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
+
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
 
 // Connect Database
 connectDB();
+
+// Store io in app for use in controllers
+app.set("io", io);
+
+// Initialize Socket Handler
+scheduleLocationUpdate(io);
 
 // Middleware
 app.use(express.json());
@@ -38,6 +68,7 @@ app.use("/api/products", productsRoutes);
 // app.use("/api/addresses", addressRoutes);
 app.use("/api/categories", categoriesRoutes);
 app.use("/api/customer", customerRoutes);
+app.use("/api/rider", riderRoutes);
 // app.use('/api/users', userLists)
 
 app.use(errorHandler);
@@ -49,4 +80,5 @@ app.use((req, res) => {
 
 // Start server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+

@@ -271,10 +271,6 @@ exports.logout = async (req, res) => {
       source: req.headers["x-source"] && ["web", "android", "ios", "admin"].includes(req.headers["x-source"]) ? req.headers["x-source"] : "web"
     });
 
-    // if (process.env.NODE_ENV === "development") {
-    //   console.log(`🚪 User logged out, session deleted:`, sessionId);
-    // }
-
     res.json({ message: "Logged out successfully" });
   } catch (err) {
     console.error("Error in logout:", err);

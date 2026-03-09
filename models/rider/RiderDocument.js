@@ -14,15 +14,10 @@ const riderDocumentSchema = new mongoose.Schema(
       "aadhar",
       "pan",
       "driving_license",
-      "rc_book",
-      "insurance",
+      "police_verification",
       "profile_photo"
     ],
     required: true
-  },
-
-  documentNumber: {
-    type: String
   },
 
   documentImage: {
@@ -39,7 +34,9 @@ const riderDocumentSchema = new mongoose.Schema(
     type: mongoose.Schema.Types.ObjectId,
     ref: "User"
   },
-
+  remark: {
+    type: String
+  },
   verifiedAt: Date
 
 },

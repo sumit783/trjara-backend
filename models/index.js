@@ -19,9 +19,9 @@ const Inventory = require("./shops/Inventory.js");
 const InventoryLog = require("./shops/InventoryLog.js");
 const QRCode = require("./shops/QRCode.js");
 const Charge = require("./charges/Charge.js");
-const StoreDocument = require("./shops/StoreDocument.js");
+const StoreDocument = require("./shops/storeDocument.js");
 const StoreSettings = require("./shops/StoreSettings.js");
-const StoreTiming = require("./shops/StoreTiming.js");
+const StoreTiming = require("./shops/storeTiming.js");
 
 // ==========================
 // Order & Delivery Models
