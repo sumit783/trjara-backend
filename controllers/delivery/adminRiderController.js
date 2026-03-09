@@ -54,7 +54,6 @@ exports.verifyDocument = async (req, res) => {
         if (status === "rejected") {
             document.remark = remark;
         }
-        document.verifiedBy = req.user.id;
         document.verifiedAt = new Date();
         await document.save();
 
