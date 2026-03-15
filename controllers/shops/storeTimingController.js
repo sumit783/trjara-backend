@@ -1,4 +1,4 @@
-const StoreTiming = require("../../models/shops/StoreTiming");
+const StoreTiming = require("../../models/shops/storeTiming");
 const Store = require("../../models/shops/Store");
 
 // Get store timings

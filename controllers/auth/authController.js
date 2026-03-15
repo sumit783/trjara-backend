@@ -11,13 +11,16 @@ const OTP_EXPIRY = 5 * 60 * 1000; // 5 minutes
 // Step 1a: Request OTP (For existing users / Login)
 exports.sendOtp = async (req, res) => {
   try {
-    const { phone } = req.body;
-    if (!phone) return res.status(400).json({ error: "Phone is required" });
+    const { phone,role } = req.body;
+    if (!phone || !role) return res.status(400).json({ error: "Phone and role are required" });
 
     let user = await User.findOne({ phone });
 
     if (!user) {
       return res.status(404).json({ error: "User not found. Please create an account first." });
+    }
+    if(user.role !== role){
+      return res.status(400).json({ error: "User does not have access to platform, please create a new account" });
     }
 
     // Fixed OTP for development, Random OTP for production

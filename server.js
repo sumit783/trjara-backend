@@ -11,6 +11,7 @@ const productsRoutes = require("./routes/shops/productRoutes.js");
 const categoriesRoutes = require("./routes/shops/categoriesRoutes.js");
 const customerRoutes = require("./routes/users/customerRoutes");
 const riderRoutes = require("./routes/auth/delivery/riderRoutes.js");
+const ownerRoutes = require("./routes/shops/ownerRoutes");
 const errorHandler = require("./middlewares/errorHandler");
 const authMiddleware = require("./middlewares/authMiddleware.js");
 const path = require("path");
@@ -69,6 +70,7 @@ app.use("/api/products", productsRoutes);
 app.use("/api/categories", categoriesRoutes);
 app.use("/api/customer", customerRoutes);
 app.use("/api/rider", riderRoutes);
+app.use("/api/owner", ownerRoutes);
 // app.use('/api/users', userLists)
 
 app.use(errorHandler);
