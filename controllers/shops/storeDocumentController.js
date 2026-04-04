@@ -1,5 +1,6 @@
 const StoreDocument = require("../../models/shops/StoreDocument");
 const Store = require("../../models/shops/Store");
+const User = require("../../models/users/User");
 const AnalyticsEvent = require("../../models/logs/AnalyticsEvent");
 
 // Upload a new document
@@ -199,6 +200,39 @@ exports.bulkVerifyDocuments = async (req, res) => {
                 },
                 source: "system"
             });
+
+            // If store is now active, verify the owner user and set their role to 'owner'
+            if (store.isActive && store.owner) {
+                const owner = await User.findById(store.owner);
+                if (owner) {
+                    let userUpdated = false;
+
+                    if (owner.role !== "owner") {
+                        owner.role = "owner";
+                        userUpdated = true;
+                    }
+
+                    if (owner.isAdminVerified !== "verified") {
+                        owner.isAdminVerified = "verified";
+                        userUpdated = true;
+                    }
+
+                    if (userUpdated) {
+                        await owner.save();
+
+                        await AnalyticsEvent.create({
+                            event: "user_verified_as_owner",
+                            properties: {
+                                userId: owner._id,
+                                storeId,
+                                role: owner.role,
+                                isAdminVerified: owner.isAdminVerified
+                            },
+                            source: "system"
+                        });
+                    }
+                }
+            }
         }
 
         res.status(200).json({

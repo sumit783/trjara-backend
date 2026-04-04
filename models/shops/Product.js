@@ -21,8 +21,11 @@ const productSchema = new mongoose.Schema(
 
     options: [
       {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "VariantOption"
+        option: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "VariantOption"
+        },
+        values: [String]
       }
     ],
     productVariant: [

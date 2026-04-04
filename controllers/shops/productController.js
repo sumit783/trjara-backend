@@ -6,6 +6,7 @@ const InventoryLog = require("../../models/shops/InventoryLog");
 const QRCode = require("../../models/shops/QRCode");
 const generateUniqueSlug = require("../../utils/slugify");
 const crypto = require("crypto");
+const mongoose = require("mongoose");
 
 // 1. Create Base Product
 exports.createProduct = async (req, res) => {
@@ -46,11 +47,11 @@ exports.createProduct = async (req, res) => {
     }
 };
 
-// 2. Add Variant Options
+// 2. Add Variant Options (Refactored to use Admin templates)
 exports.addVariantOptions = async (req, res) => {
     try {
         const { productId } = req.params;
-        const { options } = req.body; // Array of { name: 'Size', values: ['S', 'M', 'L'] }
+        const { options } = req.body; // Array of { optionId: '...', values: ['S', 'M'] }
 
         if (!options || !Array.isArray(options)) {
             return res.status(400).json({ success: false, message: "options array is required" });
@@ -61,28 +62,44 @@ exports.addVariantOptions = async (req, res) => {
             return res.status(404).json({ success: false, message: "Product not found" });
         }
 
-        const savedOptions = [];
+        const processedOptions = [];
         for (const opt of options) {
-            const newOption = new VariantOption({
-                name: opt.name,
+            if (!mongoose.Types.ObjectId.isValid(opt.optionId)) {
+                return res.status(400).json({ success: false, message: `Invalid optionId: ${opt.optionId}` });
+            }
+
+            const masterOption = await VariantOption.findById(opt.optionId);
+            if (!masterOption) {
+                return res.status(404).json({ success: false, message: `Master Variant Option not found for ID: ${opt.optionId}` });
+            }
+
+            // Verify that provided values are a subset of master values (optional validation)
+            const invalidValues = opt.values.filter(v => !masterOption.values.includes(v));
+            if (invalidValues.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Invalid values for ${masterOption.name}: ${invalidValues.join(", ")}. Must be subset of ${masterOption.values.join(", ")}`
+                });
+            }
+
+            processedOptions.push({
+                option: masterOption._id,
                 values: opt.values
             });
-            const savedOption = await newOption.save();
-            savedOptions.push(savedOption._id);
         }
 
-        // Link options to product
-        product.options = [...(product.options || []), ...savedOptions];
+        // Update product options
+        product.options = processedOptions;
         await product.save();
 
-        // Automatically sync variants as requested by the user
+        // Automatically sync variants
         const createdVariants = await syncProductVariants(productId);
 
         res.status(201).json({
             success: true,
-            message: "Variant options added and variants generated",
+            message: "Variant options linked and variants generated",
             data: {
-                options: savedOptions,
+                options: processedOptions,
                 variants: createdVariants
             }
         });
@@ -94,7 +111,7 @@ exports.addVariantOptions = async (req, res) => {
 
 // Helper function to sync/generate variants for a product
 const syncProductVariants = async (productId) => {
-    const product = await Product.findById(productId).populate("options");
+    const product = await Product.findById(productId).populate("options.option");
     if (!product) throw new Error("Product not found");
 
     if (!product.options || product.options.length === 0) {
@@ -109,7 +126,7 @@ const syncProductVariants = async (productId) => {
         );
     };
 
-    const optionNames = product.options.map(o => o.name);
+    const optionNames = product.options.map(o => o.option.name);
     const optionValuesList = product.options.map(o => o.values);
 
     const combinations = cartesianProduct(optionValuesList);
@@ -343,6 +360,152 @@ exports.deleteInventory = async (req, res) => {
 
     } catch (error) {
         console.error("Error deleting inventory:", error);
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+// 8. Get Store Products by Category
+exports.getStoreProductsByCategory = async (req, res) => {
+    try {
+        const { shopId, categoryId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(shopId) || !mongoose.Types.ObjectId.isValid(categoryId)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid shop or category ID"
+            });
+        }
+
+        const products = await Inventory.aggregate([
+            {
+                $match: {
+                    store: new mongoose.Types.ObjectId(shopId)
+                }
+            },
+            {
+                $lookup: {
+                    from: "products",
+                    localField: "product",
+                    foreignField: "_id",
+                    as: "productDetails"
+                }
+            },
+            {
+                $unwind: "$productDetails"
+            },
+            {
+                $match: {
+                    "productDetails.category": new mongoose.Types.ObjectId(categoryId)
+                }
+            },
+            {
+                $group: {
+                    _id: "$productDetails._id",
+                    product: { $first: "$productDetails" },
+                    price: { $min: "$price" },
+                    mrp: { $min: "$mrp" },
+                    stock: { $sum: "$stock" }
+                }
+            },
+            {
+                $project: {
+                    _id: 1,
+                    product: 1,
+                    price: 1,
+                    mrp: 1,
+                    stock: 1
+                }
+            }
+        ]);
+
+        res.status(200).json({
+            success: true,
+            message: "Products fetched successfully",
+            count: products.length,
+            data: products
+        });
+
+    } catch (error) {
+        console.error("Error fetching store products by category:", error);
+        res.status(500).json({
+            success: false,
+            message: "Server error",
+            error: error.message
+        });
+    }
+};
+
+// 9. Get Product by ID
+exports.getProductById = async (req, res) => {
+    try {
+        const { productId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(productId)) {
+            return res.status(400).json({ success: false, message: "Invalid product ID" });
+        }
+
+        const product = await Product.findById(productId)
+            .populate("category", "name slug")
+            .populate("options.option")
+            .populate("productVariant");
+
+        if (!product) {
+            return res.status(404).json({ success: false, message: "Product not found" });
+        }
+
+        // Fetch all inventory records for this product across all stores
+        const inventories = await Inventory.find({ product: productId })
+            .populate("store", "name logo")
+            .populate("variant");
+
+        res.status(200).json({
+            success: true,
+            data: {
+                ...product._doc,
+                inventories
+            }
+        });
+
+    } catch (error) {
+        console.error("Error fetching product by ID:", error);
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+// 10. Get all Variant Options
+exports.getVariantOptions = async (req, res) => {
+    try {
+        const options = await VariantOption.find({}, "name _id");
+        res.status(200).json({
+            success: true,
+            data: options
+        });
+    } catch (error) {
+        console.error("Error fetching variant options:", error);
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+// 11. Get all values for a specific Variant Option
+exports.getVariantValues = async (req, res) => {
+    try {
+        const { optionId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(optionId)) {
+            return res.status(400).json({ success: false, message: "Invalid variant option ID" });
+        }
+
+        const option = await VariantOption.findById(optionId, "values");
+        if (!option) {
+            return res.status(404).json({ success: false, message: "Variant option not found" });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: option.values
+        });
+    } catch (error) {
+        console.error("Error fetching variant values:", error);
         res.status(500).json({ success: false, message: "Server error", error: error.message });
     }
 };

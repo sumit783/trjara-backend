@@ -55,8 +55,12 @@ const userSchema = new mongoose.Schema(
 
     isAdminVerified: {
       type: String,
-      enum: ["pending", "verified", "rejected"],
+      enum: ["pending", "verified", "rejected","reuploaded"],
       default: "pending"
+    },
+    adminNote: {
+      type: String,
+      default: ""
     },
 
     /* ADDRESS */
@@ -70,7 +74,7 @@ const userSchema = new mongoose.Schema(
 
     isActive: {
       type: Boolean,
-      default: true
+      default: false
     },
 
     isDeleted: {

@@ -7,7 +7,10 @@ const {
     addInventory,
     generateQRCodes,
     updateInventoryStock,
-    deleteInventory
+    deleteInventory,
+    getProductById,
+    getVariantOptions,
+    getVariantValues
 } = require("../../controllers/shops/productController");
 const authMiddleware = require("../../middlewares/authMiddleware");
 
@@ -16,6 +19,14 @@ const router = express.Router();
 // 1. Create Base Product
 // Uses upload.fields to accept multiple images under the "images" key
 router.post("/", authMiddleware, upload.fields([{ name: "images", maxCount: 5 }]), createProduct);
+
+// Variant Options Routes
+// Note: Placed before /:productId to avoid conflict
+router.get("/variants/options", authMiddleware, getVariantOptions);
+router.get("/variants/options/:optionId/values", authMiddleware, getVariantValues);
+
+// Get Product by ID
+router.get("/:productId", getProductById);
 
 // 2. Add Variant Options
 router.post("/:productId/options", authMiddleware, addVariantOptions);

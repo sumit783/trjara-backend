@@ -54,10 +54,17 @@ exports.createAccount = async (req, res) => {
     const { phone, role, name, email, profileImageUrl } = req.body;
     if (!phone) return res.status(400).json({ error: "Phone is required" });
 
-    let user = await User.findOne({ phone });
+    // Check if user already exists with either phone or email
+    const query = { $or: [{ phone }] };
+    if (email) {
+      query.$or.push({ email: email.toLowerCase() });
+    }
+
+    let user = await User.findOne(query);
 
     if (user) {
-      return res.status(400).json({ error: "User already exists with this phone number." });
+      const field = user.phone === phone ? "phone number" : "email";
+      return res.status(400).json({ error: `User already exists with this ${field}.` });
     }
 
     user = new User({

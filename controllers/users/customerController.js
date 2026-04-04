@@ -50,7 +50,9 @@ exports.updateProfile = async (req, res) => {
         if (user.role === "guest" && (name || email || req.file)) {
             updateData.role = "customer";
         }
-
+        if(user.role === "owner" && user.isAdminVerified === "rejected"){
+            updateData.isAdminVerified = "reuploaded";
+        }
         // Check if email is already taken by another user
         if (email) {
             const existingUser = await User.findOne({ email: email.toLowerCase(), _id: { $ne: userId } });

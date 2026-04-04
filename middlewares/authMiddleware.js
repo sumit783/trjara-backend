@@ -21,9 +21,9 @@ const authMiddleware = async (req, res, next) => {
     }
 
     // Check if user is active
-    if (!user.isActive) {
-      return res.status(401).json({ message: 'Account is deactivated.' });
-    }
+    // if (!user.isActive) {
+    //   return res.status(401).json({ message: 'Account is deactivated.' });
+    // }
 
     // Add user to request object
     req.user = user;

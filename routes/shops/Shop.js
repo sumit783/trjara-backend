@@ -4,6 +4,8 @@ const { CreateVendorShop, EditVendorShop } = require("../../controllers/shops/Sh
 const { getStoreTiming, saveStoreTiming } = require("../../controllers/shops/storeTimingController");
 const { addBankAccount, getVendorBankAccount, verifyBankAccount, setDefaultBankAccount } = require("../../controllers/shops/bankAccountController");
 const { createCoupon, getShopCoupons, deleteCoupon } = require("../../controllers/shops/couponController");
+const { getStoreProductCategories } = require("../../controllers/shops/ownerController");
+const { getStoreProductsByCategory } = require("../../controllers/shops/productController");
 const staffRoutes = require("./staffRoutes");
 const storeDocumentRoutes = require("./storeDocumentRoutes");
 const authMiddleware = require("../../middlewares/authMiddleware");
@@ -12,8 +14,12 @@ const { adminAuthMiddleware } = require("../../middlewares/adminAuthMiddleware")
 const router = express.Router();
 
 // Store Timing routes
-router.get("/:shopId/timing", authMiddleware, getStoreTiming);
-router.post("/:shopId/timing", authMiddleware, saveStoreTiming);
+router.get("/:shopId/timing", getStoreTiming);
+router.post("/:shopId/timing", saveStoreTiming);
+
+// Category routes for store products
+router.get("/:shopId/categories", authMiddleware, getStoreProductCategories);
+router.get("/:shopId/categories/:categoryId/products", getStoreProductsByCategory);
 
 // Bank Account routes
 router.get("/bank-account", authMiddleware, getVendorBankAccount);

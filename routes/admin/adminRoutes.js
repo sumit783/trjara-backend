@@ -1,6 +1,7 @@
 const express = require("express");
 const { adminAuthMiddleware } = require("../../middlewares/adminAuthMiddleware");
 const { getAllStores, verifyStore } = require("../../controllers/shops/Shop");
+const { getAllCustomers, getCustomerById, verifyUser } = require("../../controllers/users/userController");
 const { createVariantOption, getVariantOptions, updateVariantOption, deleteVariantOption } = require("../../controllers/shops/variantOptionController");
 const { getAllRiders, getRiderDocuments, verifyDocument } = require("../../controllers/delivery/adminRiderController");
 const { createVehicleType, getAllVehicleTypes, updateVehicleType, deleteVehicleType } = require("../../controllers/delivery/vehicleTypeController");
@@ -24,6 +25,11 @@ router.delete("/variant-options/:id", adminAuthMiddleware, deleteVariantOption);
 router.get("/riders", adminAuthMiddleware, getAllRiders);
 router.get("/riders/:riderId/documents", adminAuthMiddleware, getRiderDocuments);
 router.put("/documents/:docId/verify", adminAuthMiddleware, verifyDocument);
+
+// Admin-only: User management
+router.get("/users", adminAuthMiddleware, getAllCustomers);
+router.get("/users/:id", adminAuthMiddleware, getCustomerById);
+router.put("/users/:id/verify", adminAuthMiddleware, verifyUser);
 
 // Admin-only: Vehicle Types
 router.post("/vehicle-types", adminAuthMiddleware, upload.single("image"), createVehicleType);
