@@ -1,10 +1,25 @@
 const mongoose = require("mongoose");
 
+const generateSlug = (name) => {
+    return name
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, "")
+        .replace(/[\s_]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+};
+
 const productSchema = new mongoose.Schema(
   {
     name: {
       type: String,
       required: true
+    },
+
+    slug: {
+      type: String,
+      unique: true,
+      sparse: true  // allows multiple docs without slug (null) without conflict
     },
 
     description: String,
@@ -51,5 +66,22 @@ const productSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Auto-generate slug from name before saving
+productSchema.pre("save", async function (next) {
+    if (!this.isModified("name") && this.slug) return next();
+
+    let baseSlug = generateSlug(this.name);
+    let slug = baseSlug;
+    let counter = 1;
+
+    // Ensure uniqueness
+    while (await mongoose.model("Product").exists({ slug, _id: { $ne: this._id } })) {
+        slug = `${baseSlug}-${counter++}`;
+    }
+
+    this.slug = slug;
+    next();
+});
 
 module.exports = mongoose.model("Product", productSchema);
