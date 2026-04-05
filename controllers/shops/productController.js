@@ -4,6 +4,7 @@ const ProductVariant = require("../../models/shops/ProductVariant");
 const Inventory = require("../../models/shops/Inventory");
 const InventoryLog = require("../../models/shops/InventoryLog");
 const QRCode = require("../../models/shops/QRCode");
+const Store = require("../../models/shops/Store");
 const generateUniqueSlug = require("../../utils/slugify");
 const crypto = require("crypto");
 const mongoose = require("mongoose");
@@ -11,10 +12,10 @@ const mongoose = require("mongoose");
 // 1. Create Base Product
 exports.createProduct = async (req, res) => {
     try {
-        const { name, description, brand, category, isActive } = req.body;
+        const { name, description, brand, category, isActive, shop, isAvailable } = req.body;
 
-        if (!name || !category) {
-            return res.status(400).json({ success: false, message: "name and category are required" });
+        if (!name || !category || !shop) {
+            return res.status(400).json({ success: false, message: "name, category, and shop are required" });
         }
 
         const images = [];
@@ -29,7 +30,9 @@ exports.createProduct = async (req, res) => {
             description,
             brand,
             category,
+            shop,
             images,
+            isAvailable: isAvailable !== undefined ? isAvailable : true,
             isActive: isActive !== undefined ? isActive : true
         });
 
@@ -43,6 +46,59 @@ exports.createProduct = async (req, res) => {
 
     } catch (error) {
         console.error("Error creating product:", error);
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+// Get My Products with search, filter, pagination
+exports.getMyProducts = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const { shopId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(shopId)) {
+            return res.status(400).json({ success: false, message: "Invalid shop ID" });
+        }
+
+        // Verify the shop belongs to the user
+        const shopExists = await Store.exists({ _id: shopId, owner: userId });
+        if (!shopExists) {
+            return res.status(403).json({ success: false, message: "Unauthorized or shop not found" });
+        }
+
+        const { search, category, page = 1, limit = 10 } = req.query;
+        let query = { shop: shopId };
+
+        if (search) {
+            query.name = { $regex: search, $options: 'i' };
+        }
+
+        if (category) {
+            query.category = category;
+        }
+
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const products = await Product.find(query)
+            .populate('category', 'name slug')
+            .skip(skip)
+            .limit(parseInt(limit))
+            .sort({ createdAt: -1 });
+
+        const total = await Product.countDocuments(query);
+
+        res.status(200).json({
+            success: true,
+            data: products,
+            pagination: {
+                total,
+                page: parseInt(page),
+                limit: parseInt(limit),
+                totalPages: Math.ceil(total / parseInt(limit))
+            }
+        });
+
+    } catch (error) {
+        console.error("Error fetching my products:", error);
         res.status(500).json({ success: false, message: "Server error", error: error.message });
     }
 };
@@ -64,22 +120,31 @@ exports.addVariantOptions = async (req, res) => {
 
         const processedOptions = [];
         for (const opt of options) {
-            if (!mongoose.Types.ObjectId.isValid(opt.optionId)) {
-                return res.status(400).json({ success: false, message: `Invalid optionId: ${opt.optionId}` });
+            let masterOption;
+
+            if (opt.optionId) {
+                if (!mongoose.Types.ObjectId.isValid(opt.optionId)) {
+                    return res.status(400).json({ success: false, message: `Invalid optionId: ${opt.optionId}` });
+                }
+                masterOption = await VariantOption.findById(opt.optionId);
+                if (!masterOption) {
+                    return res.status(404).json({ success: false, message: `Master Variant Option not found for ID: ${opt.optionId}` });
+                }
+            } else if (opt.name) {
+                masterOption = await VariantOption.findOne({ name: { $regex: new RegExp(`^${opt.name}$`, 'i') } });
+                if (!masterOption) {
+                    masterOption = new VariantOption({ name: opt.name, values: opt.values });
+                    await masterOption.save();
+                }
+            } else {
+                return res.status(400).json({ success: false, message: "Either optionId or name must be provided for each option" });
             }
 
-            const masterOption = await VariantOption.findById(opt.optionId);
-            if (!masterOption) {
-                return res.status(404).json({ success: false, message: `Master Variant Option not found for ID: ${opt.optionId}` });
-            }
-
-            // Verify that provided values are a subset of master values (optional validation)
-            const invalidValues = opt.values.filter(v => !masterOption.values.includes(v));
-            if (invalidValues.length > 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: `Invalid values for ${masterOption.name}: ${invalidValues.join(", ")}. Must be subset of ${masterOption.values.join(", ")}`
-                });
+            // Automatically add any brand-new variant values to the master template dictionary
+            const newValues = opt.values.filter(v => !masterOption.values.includes(v));
+            if (newValues.length > 0) {
+                masterOption.values.push(...newValues);
+                await masterOption.save();
             }
 
             processedOptions.push({
@@ -201,6 +266,10 @@ exports.addInventory = async (req, res) => {
         const createdInventories = [];
 
         for (const item of inventoryData) {
+            if (item.weight === undefined || !item.weightUnit) {
+                return res.status(400).json({ success: false, message: "Each inventory item must include weight and weightUnit" });
+            }
+
             let variantOptions = null;
             let sku = null;
 
@@ -222,6 +291,8 @@ exports.addInventory = async (req, res) => {
                 sku: sku || item.sku,
                 price: item.price,
                 mrp: item.mrp || item.price,
+                weight: item.weight,
+                weightUnit: item.weightUnit,
                 stock: item.stock || 0
             });
 
@@ -290,39 +361,61 @@ exports.generateQRCodes = async (req, res) => {
     }
 };
 
-// 6. Update Inventory Stock
-exports.updateInventoryStock = async (req, res) => {
+// 6. Update Inventory
+exports.updateInventory = async (req, res) => {
     try {
         const { inventoryId } = req.params;
-        const { stock, reason, changeType } = req.body; // changeType: "add", "remove", "adjust"
+        const { price, mrp, weight, weightUnit, sku, isAvailable, stock, reason, changeType } = req.body;
 
         const inventory = await Inventory.findById(inventoryId);
         if (!inventory) {
             return res.status(404).json({ success: false, message: "Inventory record not found" });
         }
 
-        if (changeType === "add") {
-            inventory.stock += stock;
-        } else if (changeType === "remove") {
-            inventory.stock -= stock;
-        } else {
-            inventory.stock = stock; // adjust/set
+        let stockChanged = false;
+        let loggedQuantity = stock;
+
+        // If stock is provided, handle it
+        if (stock !== undefined) {
+            if (changeType === "add") {
+                inventory.stock += stock;
+                stockChanged = true;
+            } else if (changeType === "remove") {
+                inventory.stock -= stock;
+                stockChanged = true;
+                loggedQuantity = -stock; // negative for removal
+            } else {
+                // adjust or set directly
+                loggedQuantity = stock - inventory.stock; 
+                inventory.stock = stock;
+                stockChanged = true;
+            }
         }
+
+        // Update other fields if provided
+        if (price !== undefined) inventory.price = price;
+        if (mrp !== undefined) inventory.mrp = mrp;
+        if (weight !== undefined) inventory.weight = weight;
+        if (weightUnit !== undefined) inventory.weightUnit = weightUnit;
+        if (sku !== undefined) inventory.sku = sku;
+        if (isAvailable !== undefined) inventory.isAvailable = isAvailable;
 
         const updatedInv = await inventory.save();
 
         // Log the change
-        await InventoryLog.create({
-            inventory: inventoryId,
-            changeType: changeType || "adjust",
-            quantity: changeType === "adjust" ? stock : stock, // we log the change amount or final amount? Typically change amount.
-            reason: reason || "Stock update",
-            staff: req.user._id
-        });
+        if (stockChanged) {
+            await InventoryLog.create({
+                inventory: inventoryId,
+                changeType: changeType || "adjust",
+                quantity: loggedQuantity, 
+                reason: reason || "Stock/Inventory update",
+                staff: req.user._id
+            });
+        }
 
         res.status(200).json({
             success: true,
-            message: "Inventory updated and logged successfully",
+            message: "Inventory updated successfully",
             data: updatedInv
         });
 

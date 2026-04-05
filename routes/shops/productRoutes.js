@@ -6,11 +6,12 @@ const {
     generateVariants,
     addInventory,
     generateQRCodes,
-    updateInventoryStock,
+    updateInventory,
     deleteInventory,
     getProductById,
     getVariantOptions,
-    getVariantValues
+    getVariantValues,
+    getMyProducts
 } = require("../../controllers/shops/productController");
 const authMiddleware = require("../../middlewares/authMiddleware");
 
@@ -24,6 +25,9 @@ router.post("/", authMiddleware, upload.fields([{ name: "images", maxCount: 5 }]
 // Note: Placed before /:productId to avoid conflict
 router.get("/variants/options", authMiddleware, getVariantOptions);
 router.get("/variants/options/:optionId/values", authMiddleware, getVariantValues);
+
+// Get My Products
+router.get("/:shopId/products", authMiddleware, getMyProducts);
 
 // Get Product by ID
 router.get("/:productId", getProductById);
@@ -40,8 +44,8 @@ router.post("/:productId/inventory", authMiddleware, addInventory);
 // 5. Generate QR Code - Note this is an inventory operation, mapped globally or under product
 router.post("/inventory/qrcodes/generate", authMiddleware, generateQRCodes);
 
-// 6. Update Inventory Stock
-router.put("/inventory/:inventoryId", authMiddleware, updateInventoryStock);
+// 6. Update Inventory
+router.put("/inventory/:inventoryId", authMiddleware, updateInventory);
 
 // 7. Delete Inventory
 router.delete("/inventory/:inventoryId", authMiddleware, deleteInventory);

@@ -34,8 +34,16 @@ const productSchema = new mongoose.Schema(
         ref: "ProductVariant"
       }
     ],
-
+    shop: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Store",
+      required: true
+    },
     isActive: {
+      type: Boolean,
+      default: true
+    },
+    isAvailable: {
       type: Boolean,
       default: true
     }

@@ -37,6 +37,17 @@ const inventorySchema = new mongoose.Schema(
 
     mrp: Number,
 
+    weight: {
+      type: Number,
+      required: true
+    },
+
+    weightUnit: {
+      type: String,
+      enum: ["kg", "g", "mg", "lb", "oz"],
+      required: true
+    },
+
     stock: {
       type: Number,
       default: 0
