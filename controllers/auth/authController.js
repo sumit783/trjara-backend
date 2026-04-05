@@ -17,10 +17,10 @@ exports.sendOtp = async (req, res) => {
     let user = await User.findOne({ phone });
 
     if (!user) {
-      return res.status(404).json({ error: "User not found. Please create an account first." });
+      return res.status(400).json({ success: false, error: "Please create an account first." });
     }
     if(user.role !== role){
-      return res.status(400).json({ error: "User does not have access to platform, please create a new account" });
+      return res.status(400).json({ success: false, error: "User does not have access to platform, please create a new account" });
     }
 
     // Fixed OTP for development, Random OTP for production
@@ -64,7 +64,7 @@ exports.createAccount = async (req, res) => {
 
     if (user) {
       const field = user.phone === phone ? "phone number" : "email";
-      return res.status(400).json({ error: `User already exists with this ${field}.` });
+      return res.status(400).json({success: false, error: `User already exists with this ${field}.` });
     }
 
     user = new User({
@@ -255,6 +255,91 @@ exports.verifyOtp = async (req, res) => {
     }
   } catch (err) {
     console.error("Error in verifyOtp:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+// Step 2b: Verify OTP for Signup
+exports.verifySignupOtp = async (req, res) => {
+  try {
+    const { phone, otp } = req.body;
+
+    const user = await User.findOne({ phone });
+    if (!user) return res.status(400).json({ error: "User not found" });
+
+    if (!user.otp || !user.otpExpiry) {
+      return res.status(400).json({ error: "OTP not requested" });
+    }
+
+    if (user.verified) {
+      return res.status(400).json({ error: "User is already verified" });
+    }
+
+    // Convert OTP to string for comparison
+    const otpString = String(otp);
+
+    if (user.otp !== otpString) {
+      user.otpAttempts = (user.otpAttempts || 0) + 1;
+      await user.save();
+      return res.status(400).json({ error: "Invalid OTP" });
+    }
+
+    if (user.otpExpiry < Date.now()) {
+      return res.status(400).json({ error: "OTP expired" });
+    }
+
+    // Clear OTP after verification
+    user.verified = true;
+    user.otp = null;
+    user.otpExpiry = null;
+    user.otpAttempts = 0;
+    user.lastLogin = new Date();
+    await user.save();
+
+    // Create JWT token
+    const tokenPayload = {
+      id: user._id,
+      role: user.role
+    };
+    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+    });
+
+    // Save session
+    const session = new Session({
+      userId: user._id,
+      deviceInfo: req.headers["user-agent"] || "unknown",
+      fcmToken: req.body.fcmToken || null,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
+
+    try {
+      await session.save();
+
+      await AnalyticsEvent.create({
+        event: "user_signup_verified",
+        userId: user._id,
+        sessionId: session._id,
+        properties: { role: user.role },
+        source: req.headers["x-source"] && ["web", "android", "ios", "admin"].includes(req.headers["x-source"]) ? req.headers["x-source"] : "web"
+      });
+
+      res.json({
+        message: "Signup verified successfully",
+        token,
+        user,
+        sessionId: session._id
+      });
+    } catch (sessionError) {
+      console.error("Error creating session in verifySignupOtp:", sessionError);
+      res.json({
+        message: "Signup verified successfully (session creation failed)",
+        token,
+        user
+      });
+    }
+  } catch (err) {
+    console.error("Error in verifySignupOtp:", err);
     res.status(500).json({ error: "Server error" });
   }
 };

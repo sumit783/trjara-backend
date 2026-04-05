@@ -59,10 +59,10 @@ const storeSchema = new mongoose.Schema(
     enum: ["retail", "wholesale","Dealer","Manufacturer"],
     default: "retail"
   },
-  category: {
+  category: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: "Category"
-  },
+  }],
 
   isOpen: {
     type: Boolean,

@@ -3,6 +3,7 @@ const {
   sendOtp,
   createAccount,
   verifyOtp,
+  verifySignupOtp,
   logout,
   createGuestUser,
 } = require("../../controllers/auth/authController");
@@ -24,6 +25,9 @@ router.post("/send-otp", otpRateLimiter, loggerMiddleware, validateRequest, send
 
 // Verify OTP and login
 router.post("/verify-otp", rateLimitMiddleware, loggerMiddleware, validateRequest, verifyOtp);
+
+// Verify OTP for signup
+router.post("/verify-signup-otp", rateLimitMiddleware, loggerMiddleware, validateRequest, verifySignupOtp);
 
 // Logout user (invalidate session)
 router.post("/logout", rateLimitMiddleware, loggerMiddleware, validateRequest, logout);

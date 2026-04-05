@@ -49,6 +49,21 @@ exports.CreateVendorShop = async (req, res) => {
             };
         }
 
+        // Parse category to handle array format from form-data
+        let parsedCategory = undefined;
+        if (category) {
+            if (Array.isArray(category)) {
+                parsedCategory = category;
+            } else if (typeof category === 'string') {
+                try {
+                    parsedCategory = JSON.parse(category);
+                    if (!Array.isArray(parsedCategory)) parsedCategory = [parsedCategory];
+                } catch(e) {
+                    parsedCategory = category.split(',').map(c => c.trim()).filter(Boolean);
+                }
+            }
+        }
+
         // Create shop
         const shop = new Shop({
             owner,
@@ -62,7 +77,7 @@ exports.CreateVendorShop = async (req, res) => {
             pincode,
             storeType,
             businessType,
-            category: category || undefined,
+            category: parsedCategory,
             addharNumber,
             location,
             logo,
@@ -142,10 +157,22 @@ exports.EditVendorShop = async (req, res) => {
         if (city !== undefined) shop.city = city;
         if (state !== undefined) shop.state = state;
         if (pincode !== undefined) shop.pincode = pincode;
-        if (category !== undefined) shop.category = category;
         if (storeType !== undefined) shop.storeType = storeType;
         if (businessType !== undefined) shop.businessType = businessType;
         if (addharNumber !== undefined) shop.addharNumber = addharNumber;
+
+        if (category !== undefined) {
+            if (Array.isArray(category)) {
+                shop.category = category;
+            } else if (typeof category === 'string') {
+                try {
+                    let parsed = JSON.parse(category);
+                    shop.category = Array.isArray(parsed) ? parsed : [parsed];
+                } catch(e) {
+                    shop.category = category.split(',').map(c => c.trim()).filter(Boolean);
+                }
+            }
+        }
 
         if (lng !== undefined && lat !== undefined) {
             shop.location = {

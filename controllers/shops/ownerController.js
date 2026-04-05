@@ -196,14 +196,15 @@ exports.checkVerificationStatus = async (req, res) => {
         }
 
         const documents = await StoreDocument.find({ store: store._id });
-        const requiredDocs = ["gst", "shop_license"];
         const uploadedDocs = documents.map(doc => doc.documentType);
         
-        // Check if all required docs are uploaded and verified
-        const missingDocs = requiredDocs.filter(doc => !uploadedDocs.includes(doc));
+        // Check if either GST or Shop License is uploaded
+        const hasRequiredDoc = uploadedDocs.includes("gst") || uploadedDocs.includes("shop_license");
+        
+        const missingDocs = hasRequiredDoc ? [] : ["gst", "shop_license"];
         const unverifiedDocs = documents.filter(doc => doc.verificationStatus !== "verified");
 
-        if (missingDocs.length > 0 || unverifiedDocs.length > 0) {
+        if (!hasRequiredDoc || unverifiedDocs.length > 0) {
             return res.status(200).json({
                 success: true,
                 currentStep: "documents",
