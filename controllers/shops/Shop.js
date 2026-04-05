@@ -1,4 +1,6 @@
+const mongoose = require("mongoose");
 const Shop = require("../../models/shops/Store");
+const Category = require("../../models/shops/Category");
 const User = require("../../models/users/User");
 const AnalyticsEvent = require("../../models/logs/AnalyticsEvent");
 
@@ -286,5 +288,63 @@ exports.verifyStore = async (req, res) => {
             message: "Server error",
             error: error.message,
         });
+    }
+};
+
+// Get all top-level (parent) categories for shop creation selection
+exports.getParentCategories = async (req, res) => {
+    try {
+        const categories = await Category.find({ parent: null, isActive: true }, "name slug image");
+
+        res.status(200).json({
+            success: true,
+            data: categories
+        });
+    } catch (error) {
+        console.error("Error fetching parent categories:", error);
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+// Get subcategories for the selected parent category IDs from shop's own category field
+exports.getSubcategoriesByParent = async (req, res) => {
+    try {
+        const { shopId } = req.params;
+
+        const shop = await Shop.findById(shopId, "category");
+        if (!shop) {
+            return res.status(404).json({ success: false, message: "Shop not found" });
+        }
+
+        if (!shop.category || shop.category.length === 0) {
+            return res.status(200).json({ success: true, data: [] });
+        }
+
+        // Fetch the actual category documents to check if they are top-level or subcategories
+        const shopCategories = await Category.find(
+            { _id: { $in: shop.category } },
+            "name slug parent"
+        );
+
+        // Collect the true parent IDs:
+        // - If a stored category has a parent → use that parent (it's already a subcategory)
+        // - If a stored category has no parent → use its own _id (it's a top-level category)
+        const parentIds = [...new Set(
+            shopCategories.map(c => (c.parent ? c.parent.toString() : c._id.toString()))
+        )].map(id => new mongoose.Types.ObjectId(id));
+
+        // Fetch all sibling subcategories under those parent IDs
+        const subcategories = await Category.find(
+            { parent: { $in: parentIds }, isActive: true },
+            "name slug image parent"
+        ).populate("parent", "name slug");
+
+        res.status(200).json({
+            success: true,
+            data: subcategories
+        });
+    } catch (error) {
+        console.error("Error fetching subcategories:", error);
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
     }
 };

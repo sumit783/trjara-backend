@@ -44,7 +44,7 @@ const inventorySchema = new mongoose.Schema(
 
     weightUnit: {
       type: String,
-      enum: ["kg", "g", "mg", "lb", "oz"],
+      enum: ["kg", "g", "mg", "lb", "oz", "pcs", "ltr", "ml"],
       required: true
     },
 

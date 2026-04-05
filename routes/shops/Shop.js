@@ -1,6 +1,6 @@
 const express = require("express");
 const upload = require("../../middlewares/upload");
-const { CreateVendorShop, EditVendorShop } = require("../../controllers/shops/Shop");
+const { CreateVendorShop, EditVendorShop, getParentCategories, getSubcategoriesByParent } = require("../../controllers/shops/Shop");
 const { getStoreTiming, saveStoreTiming } = require("../../controllers/shops/storeTimingController");
 const { addBankAccount, getVendorBankAccount, verifyBankAccount, setDefaultBankAccount } = require("../../controllers/shops/bankAccountController");
 const { createCoupon, getShopCoupons, deleteCoupon } = require("../../controllers/shops/couponController");
@@ -20,6 +20,10 @@ router.post("/:shopId/timing", saveStoreTiming);
 // Category routes for store products
 router.get("/:shopId/categories", authMiddleware, getStoreProductCategories);
 router.get("/:shopId/categories/:categoryId/products", getStoreProductsByCategory);
+
+// Public category routes (for shop creation flow)
+router.get("/categories/parents", getParentCategories);
+router.get("/:shopId/categories/subcategories", getSubcategoriesByParent);
 
 // Bank Account routes
 router.get("/bank-account", authMiddleware, getVendorBankAccount);

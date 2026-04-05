@@ -133,18 +133,19 @@ exports.addVariantOptions = async (req, res) => {
             } else if (opt.name) {
                 masterOption = await VariantOption.findOne({ name: { $regex: new RegExp(`^${opt.name}$`, 'i') } });
                 if (!masterOption) {
-                    masterOption = new VariantOption({ name: opt.name, values: opt.values });
-                    await masterOption.save();
+                    return res.status(404).json({ success: false, message: `Variant option '${opt.name}' does not exist. It must be created by an Admin.` });
                 }
             } else {
                 return res.status(400).json({ success: false, message: "Either optionId or name must be provided for each option" });
             }
 
-            // Automatically add any brand-new variant values to the master template dictionary
-            const newValues = opt.values.filter(v => !masterOption.values.includes(v));
-            if (newValues.length > 0) {
-                masterOption.values.push(...newValues);
-                await masterOption.save();
+            // Verify that provided values are a subset of master values
+            const invalidValues = opt.values.filter(v => !masterOption.values.includes(v));
+            if (invalidValues.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Invalid values for ${masterOption.name}: ${invalidValues.join(", ")}. Allowed values are: ${masterOption.values.join(", ")}`
+                });
             }
 
             processedOptions.push({
