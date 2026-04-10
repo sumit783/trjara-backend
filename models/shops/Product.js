@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const generateCustomId = require("../../utils/idGenerator");
 
 const generateSlug = (name) => {
     return name
@@ -11,6 +12,11 @@ const generateSlug = (name) => {
 
 const productSchema = new mongoose.Schema(
   {
+    customId: {
+      type: String,
+      unique: true,
+      sparse: true
+    },
     name: {
       type: String,
       required: true
@@ -66,6 +72,21 @@ const productSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Auto-generate customId before saving
+productSchema.pre("save", async function (next) {
+  if (this.customId) return next();
+
+  let id;
+  let exists = true;
+  while (exists) {
+    id = generateCustomId("PRD");
+    const product = await mongoose.model("Product").findOne({ customId: id });
+    if (!product) exists = false;
+  }
+  this.customId = id;
+  next();
+});
 
 // Auto-generate slug from name before saving
 productSchema.pre("save", async function (next) {

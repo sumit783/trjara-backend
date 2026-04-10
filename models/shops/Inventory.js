@@ -1,7 +1,13 @@
 const mongoose = require("mongoose");
+const generateCustomId = require("../../utils/idGenerator");
 
 const inventorySchema = new mongoose.Schema(
   {
+    customId: {
+      type: String,
+      unique: true,
+      sparse: true
+    },
     store: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Store",
@@ -61,6 +67,21 @@ const inventorySchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Auto-generate customId before saving
+inventorySchema.pre("save", async function (next) {
+  if (this.customId) return next();
+
+  let id;
+  let exists = true;
+  while (exists) {
+    id = generateCustomId("INV");
+    const inventory = await mongoose.model("Inventory").findOne({ customId: id });
+    if (!inventory) exists = false;
+  }
+  this.customId = id;
+  next();
+});
 
 inventorySchema.index({ store: 1, product: 1 });
 

@@ -1,7 +1,13 @@
 const mongoose = require("mongoose");
+const generateCustomId = require("../../utils/idGenerator");
 
 const storeSchema = new mongoose.Schema(
 {
+  customId: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
   name: {
     type: String,
     required: true
@@ -87,6 +93,21 @@ const storeSchema = new mongoose.Schema(
 },
 { timestamps: true }
 );
+
+// Auto-generate customId before saving
+storeSchema.pre("save", async function (next) {
+  if (this.customId) return next();
+
+  let id;
+  let exists = true;
+  while (exists) {
+    id = generateCustomId("STR");
+    const store = await mongoose.model("Store").findOne({ customId: id });
+    if (!store) exists = false;
+  }
+  this.customId = id;
+  next();
+});
 
 storeSchema.index({ location: "2dsphere" });
 

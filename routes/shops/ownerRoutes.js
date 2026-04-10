@@ -9,6 +9,10 @@ const {
     getVerificationData,
     checkVerificationStatus
 } = require("../../controllers/shops/ownerController");
+const { 
+    getInventoryByQRCode, 
+    processOfflineSale 
+} = require("../../controllers/shops/offlineSaleController");
 
 const router = express.Router();
 
@@ -23,5 +27,9 @@ router.get("/store-details", authMiddleware, getStoreDetails);
 router.get("/uploaded-documents", authMiddleware, getUploadedDocuments);
 router.get("/verification-data", authMiddleware, getVerificationData);
 router.get("/status-check", authMiddleware, checkVerificationStatus);
+
+// Offline Sale Routes
+router.get("/inventory/qr/:code", authMiddleware, getInventoryByQRCode);
+router.post("/sell-offline", authMiddleware, processOfflineSale);
 
 module.exports = router;

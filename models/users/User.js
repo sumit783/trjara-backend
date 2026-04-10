@@ -1,7 +1,13 @@
 const mongoose = require("mongoose");
+const generateCustomId = require("../../utils/idGenerator");
 
 const userSchema = new mongoose.Schema(
   {
+    customId: {
+      type: String,
+      unique: true,
+      sparse: true
+    },
     name: {
       type: String,
       trim: true
@@ -90,6 +96,21 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Auto-generate customId before saving
+userSchema.pre("save", async function (next) {
+  if (this.customId) return next();
+
+  let id;
+  let exists = true;
+  while (exists) {
+    id = generateCustomId("USR");
+    const user = await mongoose.model("User").findOne({ customId: id });
+    if (!user) exists = false;
+  }
+  this.customId = id;
+  next();
+});
 
 /* INDEXES */
 

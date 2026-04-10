@@ -38,7 +38,7 @@ const ChargeSchema = new mongoose.Schema(
 
   smallCartThreshold: {
     type: Number,
-    default: 0 // cart amount below this triggers charge
+    default: 0
   },
 
   /* DELIVERY */
