@@ -5,6 +5,7 @@ const Staff = require("../../models/shops/Staff");
 const Shop = require("../../models/shops/Store");
 const AnalyticsEvent = require("../../models/logs/AnalyticsEvent");
 const jwt = require("jsonwebtoken");
+const config = require("../../config/serverConfig");
 
 const OTP_EXPIRY = 5 * 60 * 1000; // 5 minutes
 
@@ -25,7 +26,7 @@ exports.sendOtp = async (req, res) => {
 
     // Fixed OTP for development, Random OTP for production
     let otp = "1234";
-    if (process.env.NODE_ENV === "production") {
+    if (config.env === "production") {
       otp = Math.floor(1000 + Math.random() * 9000).toString();
       // TODO: Integrate SMS provider here (Twilio, MSG91, etc.)
     }
@@ -77,7 +78,7 @@ exports.createAccount = async (req, res) => {
     });
 
     let otp = "1234";
-    if (process.env.NODE_ENV === "production") {
+    if (config.env === "production") {
       otp = Math.floor(1000 + Math.random() * 9000).toString();
     }
 
@@ -182,7 +183,7 @@ exports.verifyOtp = async (req, res) => {
         shopId: staffData.shopId._id
       })
     };
-    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
+    const token = jwt.sign(tokenPayload, config.jwtSecret, {
       expiresIn: "7d",
     });
 
@@ -301,7 +302,7 @@ exports.verifySignupOtp = async (req, res) => {
       id: user._id,
       role: user.role
     };
-    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
+    const token = jwt.sign(tokenPayload, config.jwtSecret, {
       expiresIn: "7d",
     });
 
@@ -383,7 +384,7 @@ exports.createGuestUser = async (req, res) => {
 
     await user.save();
 
-    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET);
+    const token = jwt.sign({ id: user._id, role: user.role }, config.jwtSecret);
 
     // Save session
     const session = new Session({

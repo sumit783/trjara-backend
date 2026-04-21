@@ -1,8 +1,10 @@
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const config = require("./config/serverConfig");
 const userAuthRoutes = require("./routes/auth/userAuthRoutes");
 const adminAuthRoutes = require("./routes/auth/adminAuthRoutes");
+
 const adminRoutes = require("./routes/admin/adminRoutes");
 const shopsRoutes = require("./routes/shops/Shop.js");
 const productsRoutes = require("./routes/shops/productRoutes.js");
@@ -15,12 +17,8 @@ const errorHandler = require("./middlewares/errorHandler");
 const app = express();
 
 // Configure CORS
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(",")
-  : "*";
-
 app.use(cors({
-  origin: allowedOrigins,
+  origin: config.allowedOrigins,
   credentials: true
 }));
 

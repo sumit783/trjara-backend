@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/users/User');
+const config = require('../config/serverConfig');
 
 const authMiddleware = async (req, res, next) => {
   try {
@@ -12,7 +13,8 @@ const authMiddleware = async (req, res, next) => {
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, config.jwtSecret);
+
     
     // Get user from database
     const user = await User.findById(decoded.id).select('-otp -otpExpiry');

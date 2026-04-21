@@ -1,5 +1,6 @@
 // middlewares/adminAuthMiddleware.js
 const jwt = require('jsonwebtoken');
+const config = require('../config/serverConfig');
 
 /**
  * Admin Authentication Middleware
@@ -19,7 +20,7 @@ const adminAuthMiddleware = async (req, res, next) => {
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
     // Verify token with jsonwebtoken using SUPABASE_JWT_SECRET
-    const decoded = jwt.verify(token, process.env.SUPABASE_JWT_SECRET);
+    const decoded = jwt.verify(token, config.supabase.jwtSecret);
 
     // Check if user is authenticated
     if (decoded.aud !== 'authenticated') {
@@ -73,7 +74,7 @@ const optionalAdminAuth = async (req, res, next) => {
     }
 
     const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, process.env.SUPABASE_JWT_SECRET);
+    const decoded = jwt.verify(token, config.supabase.jwtSecret);
 
     if (decoded && decoded.aud === 'authenticated') {
       req.admin = {

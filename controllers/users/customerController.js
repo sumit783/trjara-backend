@@ -1,5 +1,6 @@
 const User = require("../../models/users/User");
 const AnalyticsEvent = require("../../models/logs/AnalyticsEvent");
+const config = require("../../config/serverConfig");
 
 /**
  * Get current user profile
@@ -43,7 +44,7 @@ exports.updateProfile = async (req, res) => {
         if (email) updateData.email = email.toLowerCase();
 
         if (req.file) {
-            updateData.profileImageUrl = `/uploads/${req.file.filename}`;
+            updateData.profileImageUrl = req.file.path;
         }
 
         // If guest is updating profile, they become a customer
@@ -102,7 +103,7 @@ exports.sendPhoneOTP = async (req, res) => {
         }
 
         let otp = "1234"; // Default for development
-        if (process.env.NODE_ENV === "production") {
+        if (config.env === "production") {
             otp = Math.floor(1000 + Math.random() * 9000).toString();
             // TODO: Integrate SMS provider
         }

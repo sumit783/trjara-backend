@@ -22,7 +22,7 @@ exports.uploadDocument = async (req, res) => {
             return res.status(400).json({ success: false, message: "Document file is required" });
         }
 
-        const documentUrl = `/uploads/${req.file.filename}`;
+        const documentUrl = req.file.path;
 
         // Check if document of this type already exists for the store
         let storeDoc = await StoreDocument.findOne({ store: storeId, documentType });
@@ -75,7 +75,7 @@ exports.reUploadRejectedDocument = async (req, res) => {
             return res.status(404).json({ success: false, message: "Document not found" });
         }
 
-        storeDoc.documentUrl = `/uploads/${req.file.filename}`;
+        storeDoc.documentUrl = req.file.path;
         if (storeDoc.verificationStatus === "rejected") {
             storeDoc.verificationStatus = "reuploaded";
         } else {

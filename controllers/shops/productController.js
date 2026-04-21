@@ -21,7 +21,7 @@ exports.createProduct = async (req, res) => {
         const images = [];
         if (req.files && req.files["images"]) {
             for (const file of req.files["images"]) {
-                images.push(`/uploads/${file.filename}`);
+                images.push(file.path);
             }
         }
 
@@ -38,10 +38,16 @@ exports.createProduct = async (req, res) => {
 
         const savedProduct = await product.save();
 
+        // Ensure at least one variant exists (Default variant)
+        await syncProductVariants(savedProduct._id);
+
+        // Fetch the product again to include the generated variant
+        const fullProduct = await Product.findById(savedProduct._id).populate("productVariant");
+
         res.status(201).json({
             success: true,
-            message: "Product base created successfully",
-            data: savedProduct
+            message: "Product base created and initialized",
+            data: fullProduct
         });
 
     } catch (error) {
@@ -180,46 +186,53 @@ const syncProductVariants = async (productId) => {
     const product = await Product.findById(productId).populate("options.option");
     if (!product) throw new Error("Product not found");
 
-    if (!product.options || product.options.length === 0) {
-        return [];
-    }
-
-    // Helper to generate Cartesian product of arrays
-    const cartesianProduct = (arrays) => {
-        return arrays.reduce((acc, curr) =>
-            acc.flatMap(c => curr.map(n => [...c, n])),
-            [[]]
-        );
-    };
-
-    const optionNames = product.options.map(o => o.option.name);
-    const optionValuesList = product.options.map(o => o.values);
-
-    const combinations = cartesianProduct(optionValuesList);
+    // Clear existing variants from the collection for this product to avoid duplicates
+    await ProductVariant.deleteMany({ product: productId });
 
     const createdVariants = [];
 
-    // Clear existing variants from the collection for this product to avoid duplicates
-    // Note: In a production app, you might want to preserve some data (like old SKUs or images)
-    await ProductVariant.deleteMany({ product: productId });
-
-    for (const combo of combinations) {
-        const optionsMap = new Map();
-        for (let i = 0; i < optionNames.length; i++) {
-            optionsMap.set(optionNames[i], combo[i]);
-        }
-
-        const skuSuffix = combo.map(v => v.substring(0, 3).toUpperCase()).join('-');
-        const sku = `PRD-${productId.substring(18, 24)}-${skuSuffix}-${Date.now().toString().slice(-4)}`;
-
+    if (!product.options || product.options.length === 0) {
+        // Create a single default variant
+        const sku = `PRD-${productId.toString().slice(-6).toUpperCase()}-DEF-${Date.now().toString().slice(-4)}`;
         const variant = new ProductVariant({
             product: productId,
-            options: optionsMap,
+            options: {}, // Empty map
             sku: sku
         });
-
         const savedVariant = await variant.save();
         createdVariants.push(savedVariant);
+    } else {
+        // Helper to generate Cartesian product of arrays
+        const cartesianProduct = (arrays) => {
+            return arrays.reduce((acc, curr) =>
+                acc.flatMap(c => curr.map(n => [...c, n])),
+                [[]]
+            );
+        };
+
+        const optionNames = product.options.map(o => o.option.name);
+        const optionValuesList = product.options.map(o => o.values);
+
+        const combinations = cartesianProduct(optionValuesList);
+
+        for (const combo of combinations) {
+            const optionsMap = new Map();
+            for (let i = 0; i < optionNames.length; i++) {
+                optionsMap.set(optionNames[i], combo[i]);
+            }
+
+            const skuSuffix = combo.map(v => v.substring(0, 3).toUpperCase()).join('-');
+            const sku = `PRD-${productId.toString().slice(-6).toUpperCase()}-${skuSuffix}-${Date.now().toString().slice(-4)}`;
+
+            const variant = new ProductVariant({
+                product: productId,
+                options: optionsMap,
+                sku: sku
+            });
+
+            const savedVariant = await variant.save();
+            createdVariants.push(savedVariant);
+        }
     }
 
     // Link variants to product

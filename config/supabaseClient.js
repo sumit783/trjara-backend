@@ -1,18 +1,17 @@
 // services/supabaseClient.js
 const { createClient } = require('@supabase/supabase-js');
-const dotenv = require('dotenv');
-
-dotenv.config();
+const config = require('./serverConfig');
 
 const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
+  config.supabase.url,
+  config.supabase.key
 );
 
 // Admin client that bypasses RLS, using the Service Role Key
 const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  config.supabase.url,
+  config.supabase.serviceRoleKey
 );
 
 module.exports = { supabase, supabaseAdmin };
+

@@ -2,6 +2,7 @@ const { Server } = require("socket.io");
 const RiderLocation = require("../models/rider/RiderLocation");
 const Rider = require("../models/rider/Rider");
 const jwt = require("jsonwebtoken");
+const config = require("../config/serverConfig");
 
 const scheduleLocationUpdate = (io) => {
     io.on("connection", (socket) => {
@@ -10,7 +11,8 @@ const scheduleLocationUpdate = (io) => {
         // Authentication middleware for socket
         socket.on("authenticate", async (token) => {
             try {
-                const decoded = jwt.verify(token, process.env.JWT_SECRET);
+                const decoded = jwt.verify(token, config.jwtSecret);
+
                 socket.userId = decoded.id;
                 socket.role = decoded.role;
 

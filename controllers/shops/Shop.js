@@ -35,11 +35,11 @@ exports.CreateVendorShop = async (req, res) => {
 
         // Get file paths from multer
         const logo = req.files && req.files["logo"]
-            ? `/uploads/${req.files["logo"][0].filename}`
+            ? req.files["logo"][0].path
             : null;
 
         const banner = req.files && req.files["banner"]
-            ? `/uploads/${req.files["banner"][0].filename}`
+            ? req.files["banner"][0].path
             : null;
 
         // Construct location if provided
@@ -143,11 +143,11 @@ exports.EditVendorShop = async (req, res) => {
 
         // Handle file updates from multer
         const logo = req.files && req.files["logo"]
-            ? `/uploads/${req.files["logo"][0].filename}`
+            ? req.files["logo"][0].path
             : shop.logo;
 
         const banner = req.files && req.files["banner"]
-            ? `/uploads/${req.files["banner"][0].filename}`
+            ? req.files["banner"][0].path
             : shop.banner;
 
         // Update shop fields
