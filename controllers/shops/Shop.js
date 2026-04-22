@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Shop = require("../../models/shops/Store");
 const Category = require("../../models/shops/Category");
 const User = require("../../models/users/User");
+const StoreDocument = require("../../models/shops/StoreDocument");
 const AnalyticsEvent = require("../../models/logs/AnalyticsEvent");
 
 exports.CreateVendorShop = async (req, res) => {
@@ -214,14 +215,156 @@ exports.EditVendorShop = async (req, res) => {
 
 exports.getAllStores = async (req, res) => {
     try {
-        const stores = await Shop.find()
-            .populate("owner", "name email phone")
-            .populate("category", "name slug")
-            .sort({ createdAt: -1 });
+        const { search, filter, page = 1, limit = 10 } = req.query;
+        const pageNum = parseInt(page);
+        const limitNum = parseInt(limit);
+        const skip = (pageNum - 1) * limitNum;
+
+        const pipeline = [
+            // Join with owner
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "owner",
+                    foreignField: "_id",
+                    as: "ownerDetail"
+                }
+            },
+            { $unwind: { path: "$ownerDetail", preserveNullAndEmptyArrays: true } },
+
+            // Join with categories
+            {
+                $lookup: {
+                    from: "categories",
+                    localField: "category",
+                    foreignField: "_id",
+                    as: "categoryDetails"
+                }
+            },
+
+            // Join with documents
+            {
+                $lookup: {
+                    from: "storedocuments",
+                    localField: "_id",
+                    foreignField: "store",
+                    as: "docs"
+                }
+            },
+
+            // Calculate derived status
+            {
+                $addFields: {
+                    ownerVerified: { $eq: ["$ownerDetail.isAdminVerified", "verified"] },
+                    storeVerified: { $eq: ["$adminVerificationStatus", "verified"] },
+                    docsVerified: {
+                        $and: [
+                            // At least one verified document of required type (gst or shop_license)
+                            {
+                                $gt: [
+                                    {
+                                        $size: {
+                                            $filter: {
+                                                input: "$docs",
+                                                as: "d",
+                                                cond: {
+                                                    $and: [
+                                                        { $eq: ["$$d.verificationStatus", "verified"] },
+                                                        { $in: ["$$d.documentType", ["gst", "shop_license"]] }
+                                                    ]
+                                                }
+                                            }
+                                        }
+                                    },
+                                    0
+                                ]
+                            },
+                            // AND no documents are in pending/rejected/reuploaded state (all uploaded documents must be verified)
+                            {
+                                $eq: [
+                                    {
+                                        $size: {
+                                            $filter: {
+                                                input: "$docs",
+                                                as: "d",
+                                                cond: { $ne: ["$$d.verificationStatus", "verified"] }
+                                            }
+                                        }
+                                    },
+                                    0
+                                ]
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                $addFields: {
+                    status: {
+                        $cond: {
+                            if: { $and: ["$ownerVerified", "$storeVerified", "$docsVerified"] },
+                            then: "verified",
+                            else: "unverified"
+                        }
+                    }
+                }
+            }
+        ];
+
+        // Search Match
+        if (search) {
+            const searchRegex = new RegExp(search, "i");
+            pipeline.push({
+                $match: {
+                    $or: [
+                        { name: searchRegex },
+                        { "ownerDetail.name": searchRegex }
+                    ]
+                }
+            });
+        }
+
+        // Filter Match
+        if (filter) {
+            pipeline.push({
+                $match: {
+                    status: filter // "verified" or "unverified"
+                }
+            });
+        }
+
+        // Final Projection and Pagination
+        pipeline.push({
+            $facet: {
+                metadata: [{ $count: "total" }],
+                data: [
+                    { $sort: { createdAt: -1 } },
+                    { $skip: skip },
+                    { $limit: limitNum },
+                    {
+                        $project: {
+                            _id: 1,
+                            name: 1,
+                            ownerName: "$ownerDetail.name",
+                            registeredDate: "$createdAt",
+                            status: 1,
+                            categories: "$categoryDetails.name"
+                        }
+                    }
+                ]
+            }
+        });
+
+        const result = await Shop.aggregate(pipeline);
+        const stores = result[0].data;
+        const total = result[0].metadata[0] ? result[0].metadata[0].total : 0;
 
         res.status(200).json({
             success: true,
             message: "Stores fetched successfully",
+            total,
+            page: pageNum,
+            limit: limitNum,
             count: stores.length,
             data: stores,
         });
@@ -346,5 +489,40 @@ exports.getSubcategoriesByParent = async (req, res) => {
     } catch (error) {
         console.error("Error fetching subcategories:", error);
         res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+exports.getStoreDetailsById = async (req, res) => {
+    try {
+        const { storeId } = req.params;
+
+        const store = await Shop.findById(storeId)
+            .populate("owner", "-otp -otpExpiry -otpAttempts")
+            .populate("category", "name slug");
+
+        if (!store) {
+            return res.status(404).json({
+                success: false,
+                message: "Store not found"
+            });
+        }
+
+        const documents = await StoreDocument.find({ store: storeId });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                owner: store.owner,
+                store,
+                documents
+            }
+        });
+    } catch (error) {
+        console.error("Error fetching store details:", error);
+        res.status(500).json({
+            success: false,
+            message: "Server error",
+            error: error.message
+        });
     }
 };

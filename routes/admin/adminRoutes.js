@@ -1,6 +1,6 @@
 const express = require("express");
 const { adminAuthMiddleware } = require("../../middlewares/adminAuthMiddleware");
-const { getAllStores, verifyStore } = require("../../controllers/shops/Shop");
+const { getAllStores, verifyStore, getStoreDetailsById } = require("../../controllers/shops/Shop");
 const { getAllCustomers, getCustomerById, verifyUser } = require("../../controllers/users/userController");
 const { createVariantOption, getVariantOptions, updateVariantOption, deleteVariantOption } = require("../../controllers/shops/variantOptionController");
 const { getAllRiders, getRiderDocuments, verifyDocument } = require("../../controllers/delivery/adminRiderController");
@@ -11,6 +11,9 @@ const router = express.Router();
 
 // Admin-only: Get all stores
 router.get("/stores", adminAuthMiddleware, getAllStores);
+
+// Admin-only: Get store details by ID
+router.get("/stores/:storeId", adminAuthMiddleware, getStoreDetailsById);
 
 // Admin-only: Verify store
 router.put("/stores/:storeId/verify", adminAuthMiddleware, verifyStore);

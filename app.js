@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const morgan = require("morgan");
 const config = require("./config/serverConfig");
 const userAuthRoutes = require("./routes/auth/userAuthRoutes");
 const adminAuthRoutes = require("./routes/auth/adminAuthRoutes");
@@ -15,6 +16,9 @@ const ownerRoutes = require("./routes/shops/ownerRoutes");
 const errorHandler = require("./middlewares/errorHandler");
 
 const app = express();
+
+// Use morgan for request logging
+app.use(morgan("dev"));
 
 // Configure CORS
 app.use(cors({
