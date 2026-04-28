@@ -2,54 +2,57 @@
 const User = require('../../models/users/User');
 
 /**
- * Get all customers (users)
- * @route GET /api/admin/customers
+ * Get all users with search, role filtering and pagination
+ * @route GET /api/admin/users
  * @access Private (Admin only)
  */
-exports.getAllCustomers = async (req, res) => {
+exports.getAllUsers = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
+    const { search, role } = req.query;
+
     // Build filter object
-    const filter = {};
+    const filter = { isDeleted: false };
     
-    // Search by name or email
-    if (req.query.search) {
+    // Search by name, email, phone or customId
+    if (search) {
       filter.$or = [
-        { firstName: { $regex: req.query.search, $options: 'i' } },
-        { lastName: { $regex: req.query.search, $options: 'i' } },
-        { email: { $regex: req.query.search, $options: 'i' } }
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } },
+        { customId: { $regex: search, $options: 'i' } }
       ];
     }
 
-    // Filter by status
-    if (req.query.status) {
-      filter.isActive = req.query.status === 'active';
+    // Filter by role
+    if (role && role !== 'all') {
+      filter.role = role;
     }
 
     // Get total count for pagination
-    const totalCustomers = await User.countDocuments(filter);
+    const totalUsers = await User.countDocuments(filter);
     
-    // Get customers with pagination
-    const customers = await User.find(filter)
-      .select('-password -otp -otpExpiry -refreshToken')
+    // Get users with pagination
+    const users = await User.find(filter)
+      .select('-otp -otpExpiry -otpAttempts')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
 
-    const totalPages = Math.ceil(totalCustomers / limit);
+    const totalPages = Math.ceil(totalUsers / limit);
 
     res.json({
       success: true,
-      message: 'Customers retrieved successfully',
+      message: 'Users retrieved successfully',
       data: {
-        customers,
+        users,
         pagination: {
           currentPage: page,
           totalPages,
-          totalCustomers,
+          totalUsers,
           hasNextPage: page < totalPages,
           hasPrevPage: page > 1
         }
@@ -57,10 +60,10 @@ exports.getAllCustomers = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error in getAllCustomers:', error);
+    console.error('Error in getAllUsers:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to retrieve customers',
+      message: 'Failed to retrieve users',
       error: error.message
     });
   }

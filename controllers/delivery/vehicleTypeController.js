@@ -5,7 +5,7 @@ const VehicleType = require("../../models/rider/VehicleType");
 // @access  Private (Admin only)
 exports.createVehicleType = async (req, res) => {
     try {
-        const { name, maxLoadKg, averageSpeed } = req.body;
+        const { name, maxLoadKg, averageSpeed, pricingModel, pricing, isActive } = req.body;
 
         if (!name) {
             return res.status(400).json({ error: "Vehicle type name is required" });
@@ -20,7 +20,10 @@ exports.createVehicleType = async (req, res) => {
             name,
             image: req.file ? req.file.path : undefined,
             maxLoadKg,
-            averageSpeed
+            averageSpeed,
+            pricingModel,
+            pricing,
+            isActive: isActive !== undefined ? isActive : true
         });
 
         await vehicleType.save();
@@ -57,7 +60,7 @@ exports.getAllVehicleTypes = async (req, res) => {
 // @access  Private (Admin only)
 exports.updateVehicleType = async (req, res) => {
     try {
-        const { name, maxLoadKg, averageSpeed, isActive } = req.body;
+        const { name, maxLoadKg, averageSpeed, pricingModel, pricing, isActive } = req.body;
 
         const vehicleType = await VehicleType.findById(req.params.id);
         if (!vehicleType) {
@@ -70,6 +73,8 @@ exports.updateVehicleType = async (req, res) => {
         }
         vehicleType.maxLoadKg = maxLoadKg !== undefined ? maxLoadKg : vehicleType.maxLoadKg;
         vehicleType.averageSpeed = averageSpeed !== undefined ? averageSpeed : vehicleType.averageSpeed;
+        vehicleType.pricingModel = pricingModel || vehicleType.pricingModel;
+        vehicleType.pricing = pricing !== undefined ? pricing : vehicleType.pricing;
         vehicleType.isActive = isActive !== undefined ? isActive : vehicleType.isActive;
 
         await vehicleType.save();

@@ -109,6 +109,48 @@ exports.getMyProducts = async (req, res) => {
     }
 };
 
+// Get all products (Admin)
+exports.getAllProducts = async (req, res) => {
+    try {
+        const { search, category, page = 1, limit = 10 } = req.query;
+        let query = {};
+
+        if (search) {
+            query.name = { $regex: search, $options: 'i' };
+        }
+
+        if (category) {
+            query.category = category;
+        }
+
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const products = await Product.find(query)
+            .select("-productVariant")
+            .populate('category', 'name slug')
+            .populate('shop', 'name logo')
+            .populate('options.option', 'name')
+            .skip(skip)
+            .limit(parseInt(limit))
+            .sort({ createdAt: -1 });
+
+        const total = await Product.countDocuments(query);
+
+        res.status(200).json({
+            success: true,
+            data: products,
+            pagination: {
+                total,
+                page: parseInt(page),
+                limit: parseInt(limit),
+                totalPages: Math.ceil(total / parseInt(limit))
+            }
+        });
+    } catch (error) {
+        console.error("Error fetching all products:", error);
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
 // 2. Add Variant Options (Refactored to use Admin templates)
 exports.addVariantOptions = async (req, res) => {
     try {

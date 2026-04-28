@@ -526,3 +526,156 @@ exports.getStoreDetailsById = async (req, res) => {
         });
     }
 };
+
+exports.getStoresWithProducts = async (req, res) => {
+    try {
+        const { search, category, page = 1, limit = 10 } = req.query;
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        let match = {};
+        if (search) {
+            match.name = { $regex: search, $options: 'i' };
+        }
+
+        if (category) {
+            match.category = new mongoose.Types.ObjectId(category);
+        }
+
+        const pipeline = [
+            { $match: match },
+            // Populate owner
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "owner",
+                    foreignField: "_id",
+                    as: "owner"
+                }
+            },
+            { $unwind: "$owner" },
+            // Populate categories
+            {
+                $lookup: {
+                    from: "categories",
+                    localField: "category",
+                    foreignField: "_id",
+                    as: "categoryDetails"
+                }
+            },
+            // Populate products with variant option names
+            {
+                $lookup: {
+                    from: "products",
+                    let: { shopId: "$_id" },
+                    pipeline: [
+                        { $match: { $expr: { $eq: ["$shop", "$$shopId"] } } },
+                        {
+                            $lookup: {
+                                from: "variantoptions",
+                                localField: "options.option",
+                                foreignField: "_id",
+                                as: "optionDetails"
+                            }
+                        },
+                        {
+                            $project: {
+                                _id: 1,
+                                name: 1,
+                                images: 1,
+                                options: {
+                                    $map: {
+                                        input: "$options",
+                                        as: "opt",
+                                        in: {
+                                            values: "$$opt.values",
+                                            option: {
+                                                $arrayElemAt: [
+                                                    {
+                                                        $filter: {
+                                                            input: "$optionDetails",
+                                                            as: "od",
+                                                            cond: { $eq: ["$$od._id", "$$opt.option"] }
+                                                        }
+                                                    },
+                                                    0
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    as: "products"
+                }
+            },
+            // Filter out stores with no products
+            {
+                $match: {
+                    "products.0": { $exists: true }
+                }
+            },
+            {
+                $facet: {
+                    metadata: [{ $count: "total" }],
+                    data: [
+                        { $sort: { name: 1 } },
+                        { $skip: skip },
+                        { $limit: parseInt(limit) },
+                        {
+                            $project: {
+                                name: 1,
+                                "owner.name": 1,
+                                logo: 1,
+                                storeType: 1,
+                                businessType: 1,
+                                categories: "$categoryDetails.name",
+                                products: {
+                                    $map: {
+                                        input: "$products",
+                                        as: "p",
+                                        in: {
+                                            _id: "$$p._id",
+                                            name: "$$p.name",
+                                            images: "$$p.images",
+                                            options: {
+                                                $map: {
+                                                    input: "$$p.options",
+                                                    as: "o",
+                                                    in: {
+                                                        name: "$$o.option.name",
+                                                        values: "$$o.values"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        ];
+
+        const result = await Shop.aggregate(pipeline);
+        const stores = result[0].data;
+        const total = result[0].metadata[0] ? result[0].metadata[0].total : 0;
+
+        res.json({
+            success: true,
+            total,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            count: stores.length,
+            data: stores
+        });
+    } catch (error) {
+        console.error("Error in getStoresWithProducts:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to retrieve stores with products",
+            error: error.message
+        });
+    }
+};

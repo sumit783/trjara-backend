@@ -19,6 +19,15 @@ const vehicleTypeSchema = new mongoose.Schema({
     averageSpeed: {
         type: Number
     },
+    pricingModel: {
+        type: String,
+        enum: ["fixed", "dynamic"],
+        default: "fixed"
+    },
+
+    pricing: {
+        type: Number
+    },
 
     isActive: {
         type: Boolean,

@@ -16,7 +16,7 @@ exports.createCategory = async (req, res) => {
         const slug = await generateUniqueSlug(name, Category);
 
         const image = req.files?.["image"]
-            ? `/uploads/${req.files["image"][0].filename}`
+            ? req.files["image"][0].path
             : null;
 
         const category = new Category({
@@ -60,7 +60,7 @@ exports.updateCategory = async (req, res) => {
         if (isActive !== undefined) category.isActive = isActive;
 
         if (req.files?.["image"]) {
-            category.image = `/uploads/${req.files["image"][0].filename}`;
+            category.image = req.files["image"][0].path;
         }
 
         const updated = await category.save();

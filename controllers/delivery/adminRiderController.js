@@ -1,5 +1,6 @@
 const Rider = require("../../models/rider/Rider");
 const RiderDocument = require("../../models/rider/RiderDocument");
+const RiderVehicle = require("../../models/rider/RiderVehicle");
 const User = require("../../models/users/User");
 
 // @desc    Get all riders
