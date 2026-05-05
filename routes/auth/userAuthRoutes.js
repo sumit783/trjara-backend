@@ -5,7 +5,6 @@ const {
   verifyOtp,
   verifySignupOtp,
   logout,
-  createGuestUser,
 } = require("../../controllers/auth/authController");
 const validateRequest = require("../../middlewares/validateRequest");
 const rateLimitMiddleware = require("../../middlewares/rateLimitMiddleware");
@@ -17,8 +16,6 @@ const router = express.Router();
 // 1. Create Account (Signup)
 router.post("/create-account", otpRateLimiter, loggerMiddleware, validateRequest, createAccount);
 
-// 1b. Guest Signup (Anonymous)
-router.post("/guest-signup", otpRateLimiter, loggerMiddleware, createGuestUser);
 
 // 2. Send OTP (Login)
 router.post("/send-otp", otpRateLimiter, loggerMiddleware, validateRequest, sendOtp);

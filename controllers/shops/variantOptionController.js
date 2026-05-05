@@ -34,15 +34,33 @@ exports.createVariantOption = async (req, res) => {
     }
 };
 
-// Get all variant options
+// Get all variant options (with search and pagination)
 exports.getVariantOptions = async (req, res) => {
     try {
-        const options = await VariantOption.find().sort({ createdAt: -1 });
+        const { search, page = 1, limit = 10 } = req.query;
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        let query = { isActive: { $ne: false } };
+        if (search) {
+            query.name = { $regex: search, $options: "i" };
+        }
+
+        const total = await VariantOption.countDocuments(query);
+        const options = await VariantOption.find(query)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(parseInt(limit));
 
         res.status(200).json({
             success: true,
             message: "Variant options fetched successfully",
             count: options.length,
+            pagination: {
+                total,
+                page: parseInt(page),
+                limit: parseInt(limit),
+                totalPages: Math.ceil(total / parseInt(limit))
+            },
             data: options
         });
     } catch (error) {
@@ -91,7 +109,7 @@ exports.deleteVariantOption = async (req, res) => {
     try {
         const { id } = req.params;
 
-        const deleted = await VariantOption.findByIdAndDelete(id);
+        const deleted = await VariantOption.findByIdAndUpdate(id, { isActive: false }, { new: true });
         if (!deleted) {
             return res.status(404).json({ success: false, message: "Variant option not found" });
         }

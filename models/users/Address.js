@@ -15,11 +15,11 @@ const addressSchema = new mongoose.Schema(
   },
 
   name: {
-    type: String, // person receiving order
+    type: String,
   },
 
   phone: {
-    type: String, // contact number for delivery
+    type: String,
   },
 
   addressLine1: {
@@ -57,7 +57,7 @@ const addressSchema = new mongoose.Schema(
       default: "Point",
     },
     coordinates: {
-      type: [Number], // [longitude, latitude]
+      type: [Number],
       required: true,
     },
   },
@@ -74,6 +74,16 @@ const addressSchema = new mongoose.Schema(
 },
 { timestamps: true }
 );
+
+addressSchema.pre("save", async function (next) {
+  if (this.isModified("isDefault") && this.isDefault) {
+    await mongoose.model("Address").updateMany(
+      { userId: this.userId, _id: { $ne: this._id } },
+      { $set: { isDefault: false } }
+    );
+  }
+  next();
+});
 
 addressSchema.index({ location: "2dsphere" });
 

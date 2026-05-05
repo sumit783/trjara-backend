@@ -9,12 +9,6 @@ const cartSchema = new mongoose.Schema(
     unique: true
   },
 
-  shopId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Shop",
-    required: true
-  },
-
   itemsTotal: {
     type: Number,
     default: 0

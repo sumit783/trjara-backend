@@ -13,6 +13,7 @@ const categoriesRoutes = require("./routes/shops/categoriesRoutes.js");
 const customerRoutes = require("./routes/users/customerRoutes");
 const riderRoutes = require("./routes/auth/delivery/riderRoutes.js");
 const ownerRoutes = require("./routes/shops/ownerRoutes");
+const cartRoutes = require("./routes/users/cartRoutes");
 const errorHandler = require("./middlewares/errorHandler");
 
 const app = express();
@@ -44,6 +45,7 @@ app.use("/api/categories", categoriesRoutes);
 app.use("/api/customer", customerRoutes);
 app.use("/api/rider", riderRoutes);
 app.use("/api/owner", ownerRoutes);
+app.use("/api/cart", cartRoutes);
 
 // Error Handling
 app.use(errorHandler);

@@ -5,7 +5,7 @@ const VehicleType = require("../../models/rider/VehicleType");
 // @access  Private (Admin only)
 exports.createVehicleType = async (req, res) => {
     try {
-        const { name, maxLoadKg, averageSpeed, pricingModel, pricing, isActive } = req.body;
+        const { name, maxLoadKg, averageSpeed, isActive } = req.body;
 
         if (!name) {
             return res.status(400).json({ error: "Vehicle type name is required" });
@@ -21,8 +21,6 @@ exports.createVehicleType = async (req, res) => {
             image: req.file ? req.file.path : undefined,
             maxLoadKg,
             averageSpeed,
-            pricingModel,
-            pricing,
             isActive: isActive !== undefined ? isActive : true
         });
 
@@ -60,7 +58,7 @@ exports.getAllVehicleTypes = async (req, res) => {
 // @access  Private (Admin only)
 exports.updateVehicleType = async (req, res) => {
     try {
-        const { name, maxLoadKg, averageSpeed, pricingModel, pricing, isActive } = req.body;
+        const { name, maxLoadKg, averageSpeed, isActive } = req.body;
 
         const vehicleType = await VehicleType.findById(req.params.id);
         if (!vehicleType) {
@@ -73,8 +71,6 @@ exports.updateVehicleType = async (req, res) => {
         }
         vehicleType.maxLoadKg = maxLoadKg !== undefined ? maxLoadKg : vehicleType.maxLoadKg;
         vehicleType.averageSpeed = averageSpeed !== undefined ? averageSpeed : vehicleType.averageSpeed;
-        vehicleType.pricingModel = pricingModel || vehicleType.pricingModel;
-        vehicleType.pricing = pricing !== undefined ? pricing : vehicleType.pricing;
         vehicleType.isActive = isActive !== undefined ? isActive : vehicleType.isActive;
 
         await vehicleType.save();
@@ -95,7 +91,7 @@ exports.updateVehicleType = async (req, res) => {
 // @access  Private (Admin only)
 exports.deleteVehicleType = async (req, res) => {
     try {
-        const vehicleType = await VehicleType.findByIdAndDelete(req.params.id);
+        const vehicleType = await VehicleType.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
         if (!vehicleType) {
             return res.status(404).json({ error: "Vehicle type not found" });
         }

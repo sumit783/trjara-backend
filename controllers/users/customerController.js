@@ -47,10 +47,7 @@ exports.updateProfile = async (req, res) => {
             updateData.profileImageUrl = req.file.path;
         }
 
-        // If guest is updating profile, they become a customer
-        if (user.role === "guest" && (name || email || req.file)) {
-            updateData.role = "customer";
-        }
+
         if(user.role === "owner" && user.isAdminVerified === "rejected"){
             updateData.isAdminVerified = "reuploaded";
         }
@@ -155,17 +152,12 @@ exports.verifyPhoneOTP = async (req, res) => {
             return res.status(400).json({ success: false, message: "Invalid OTP" });
         }
 
-        // Update phone and role if guest
         const updateData = {
             phone,
             otp: null,
             otpExpiry: null,
             verified: true
         };
-
-        if (user.role === "guest") {
-            updateData.role = "customer";
-        }
 
         const updatedUser = await User.findByIdAndUpdate(
             req.user._id,

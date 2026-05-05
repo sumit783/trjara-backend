@@ -25,6 +25,11 @@ const cartItemSchema = new mongoose.Schema(
     ref: "InventoryVariant"
   },
 
+  shopId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Store"
+  },
+
   name: {
     type: String
   },

@@ -146,3 +146,48 @@ exports.processOfflineSale = async (req, res) => {
         });
     }
 };
+
+/**
+ * Get QR code by inventory ID
+ * @route GET /api/owner/inventory/:inventoryId/qr
+ * @access Private (Owner)
+ */
+exports.getQRCodeByInventoryId = async (req, res) => {
+    try {
+        const { inventoryId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(inventoryId)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid inventory ID"
+            });
+        }
+
+        const qrRecord = await QRCode.findOne({ inventory: inventoryId, isActive: true });
+
+        if (!qrRecord) {
+            return res.status(404).json({
+                success: false,
+                message: "QR code not found for this inventory"
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "QR code fetched successfully",
+            data: {
+                code: qrRecord.code,
+                inventoryId: qrRecord.inventory,
+                storeId: qrRecord.store
+            }
+        });
+
+    } catch (error) {
+        console.error("Error fetching QR code by inventory ID:", error);
+        res.status(500).json({
+            success: false,
+            message: "Server error",
+            error: error.message
+        });
+    }
+};

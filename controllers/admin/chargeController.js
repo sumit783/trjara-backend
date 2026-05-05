@@ -170,6 +170,67 @@ exports.getCharges = async (req, res) => {
 };
 
 /**
+ * @desc    Get a single charge by ID with full population
+ * @route   GET /api/admin/charges/:id
+ * @access  Private (Admin only)
+ */
+exports.getChargeById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const charge = await Charge.findById(id).lean();
+
+        if (!charge) {
+            return res.status(404).json({
+                success: false,
+                message: "Charge not found"
+            });
+        }
+
+        let populatedCharge = charge;
+        if (charge.scopeId && charge.scope !== "Global") {
+            const populateOptions = {
+                path: 'scopeId'
+            };
+
+            if (charge.scope === 'Shop') {
+                populateOptions.model = 'Store';
+            }
+
+            if (charge.scope === 'Store' || charge.scope === 'Shop') {
+                populateOptions.populate = {
+                    path: 'owner'
+                };
+            } else if (charge.scope === 'Product') {
+                populateOptions.populate = [
+                    { path: 'shop' },
+                    { path: 'category' }
+                ];
+            } else if (charge.scope === 'Inventory') {
+                populateOptions.populate = [
+                    { path: 'store' },
+                    { path: 'product' },
+                    { path: 'variant' }
+                ];
+            }
+
+            populatedCharge = await Charge.populate(charge, populateOptions);
+        }
+
+        res.json({
+            success: true,
+            data: populatedCharge
+        });
+    } catch (error) {
+        console.error("Error in getChargeById:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to retrieve charge details",
+            error: error.message
+        });
+    }
+};
+
+/**
  * @desc    Update a charge
  * @route   PUT /api/admin/charges/:id
  * @access  Private (Admin only)

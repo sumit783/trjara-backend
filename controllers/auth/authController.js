@@ -50,6 +50,8 @@ exports.sendOtp = async (req, res) => {
 };
 
 // Step 1b: Create Account (For new users / Signup)
+// This route supports both full signup and quick phone-only signup.
+// Profile details (name, email) can be completed later via updateProfile.
 exports.createAccount = async (req, res) => {
   try {
     const { phone, role, name, email, profileImageUrl } = req.body;
@@ -70,7 +72,7 @@ exports.createAccount = async (req, res) => {
 
     user = new User({
       phone,
-      role: role || "guest",
+      role: role || "customer",
       name,
       email,
       profileImageUrl,
@@ -374,42 +376,3 @@ exports.logout = async (req, res) => {
   }
 };
 
-// Step 4: Create Guest User
-exports.createGuestUser = async (req, res) => {
-  try {
-    const user = new User({
-      role: "guest",
-      verified: false
-    });
-
-    await user.save();
-
-    const token = jwt.sign({ id: user._id, role: user.role }, config.jwtSecret);
-
-    // Save session
-    const session = new Session({
-      userId: user._id,
-      deviceInfo: req.headers["user-agent"] || "unknown",
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    });
-
-    await session.save();
-
-    await AnalyticsEvent.create({
-      event: "guest_user_created",
-      userId: user._id,
-      source: req.headers["x-source"] || "web"
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: "Guest user created successfully",
-      token,
-      user,
-      sessionId: session._id
-    });
-  } catch (err) {
-    console.error("Error in createGuestUser:", err);
-    res.status(500).json({ error: "Server error" });
-  }
-};

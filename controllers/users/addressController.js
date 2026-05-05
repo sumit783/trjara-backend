@@ -4,44 +4,40 @@ const Address = require("../../models/users/Address");
 exports.createAddress = async (req, res) => {
     try {
         const {
-            ownerType,
-            ownerId,
             label,
-            line1,
-            line2,
+            name,
+            phone,
+            addressLine1,
+            addressLine2,
+            landmark,
             city,
             state,
             pincode,
-            country,
-            lat,
-            lng,
+            coordinates, // Expected as [lng, lat]
             isDefault,
         } = req.body;
 
-        if (!ownerType || !ownerId || !line1 || !city || !state || !pincode) {
+        const userId = req.user.id;
+
+        if (!addressLine1 || !city || !state || !pincode || !coordinates) {
             return res.status(400).json({ success: false, message: "Missing required fields" });
         }
 
-        // If isDefault is true, unset others for this owner
-        if (isDefault) {
-            await Address.updateMany(
-                { ownerType, ownerId },
-                { $set: { isDefault: false } }
-            );
-        }
-
         const address = new Address({
-            ownerType,
-            ownerId,
+            userId,
             label,
-            line1,
-            line2,
+            name,
+            phone,
+            addressLine1,
+            addressLine2,
+            landmark,
             city,
             state,
             pincode,
-            country,
-            lat,
-            lng,
+            location: {
+                type: "Point",
+                coordinates: coordinates,
+            },
             isDefault: !!isDefault,
         });
 
@@ -62,21 +58,31 @@ exports.createAddress = async (req, res) => {
 exports.updateAddress = async (req, res) => {
     try {
         const { addressId } = req.params;
+        const userId = req.user.id;
         const updates = req.body;
 
-        if (updates.isDefault) {
-            const existing = await Address.findById(addressId);
-            await Address.updateMany(
-                { ownerType: existing.ownerType, ownerId: existing.ownerId },
-                { $set: { isDefault: false } }
-            );
+        // If location is updated, format it correctly
+        if (updates.coordinates) {
+            updates.location = {
+                type: "Point",
+                coordinates: updates.coordinates,
+            };
+            delete updates.coordinates;
         }
 
-        const updatedAddress = await Address.findByIdAndUpdate(addressId, updates, { new: true });
+        // Find the address first
+        const address = await Address.findOne({ _id: addressId, userId: userId });
 
-        if (!updatedAddress) {
-            return res.status(404).json({ success: false, message: "Address not found" });
+        if (!address) {
+            return res.status(404).json({ success: false, message: "Address not found or unauthorized" });
         }
+
+        // Apply updates
+        Object.keys(updates).forEach((key) => {
+            address[key] = updates[key];
+        });
+
+        const updatedAddress = await address.save();
 
         res.json({
             success: true,
@@ -93,11 +99,12 @@ exports.updateAddress = async (req, res) => {
 exports.deleteAddress = async (req, res) => {
     try {
         const { addressId } = req.params;
+        const userId = req.user.id;
 
-        const deleted = await Address.findByIdAndDelete(addressId);
+        const deleted = await Address.findOneAndDelete({ _id: addressId, userId: userId });
 
         if (!deleted) {
-            return res.status(404).json({ success: false, message: "Address not found" });
+            return res.status(404).json({ success: false, message: "Address not found or unauthorized" });
         }
 
         res.json({
@@ -110,16 +117,12 @@ exports.deleteAddress = async (req, res) => {
     }
 };
 
-// Get All Addresses for Owner
+// Get All Addresses for User
 exports.getAddresses = async (req, res) => {
     try {
-        const { ownerType, ownerId } = req.query;
+        const userId = req.user.id;
 
-        if (!ownerType || !ownerId) {
-            return res.status(400).json({ success: false, message: "ownerType and ownerId are required" });
-        }
-
-        const addresses = await Address.find({ ownerType, ownerId });
+        const addresses = await Address.find({ userId: userId, isActive: true });
 
         res.json({
             success: true,

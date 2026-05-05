@@ -5,7 +5,7 @@ const { getAllUsers, getCustomerById, verifyUser } = require("../../controllers/
 const { createVariantOption, getVariantOptions, updateVariantOption, deleteVariantOption } = require("../../controllers/shops/variantOptionController");
 const { getAllRiders, getRiderDocuments, verifyDocument } = require("../../controllers/delivery/adminRiderController");
 const { createVehicleType, getAllVehicleTypes, updateVehicleType, deleteVehicleType } = require("../../controllers/delivery/vehicleTypeController");
-const { createCharge, getCharges, updateCharge, deleteCharge, getStoresWithCharges, getProductsWithCharges } = require("../../controllers/admin/chargeController");
+const { createCharge, getCharges, getChargeById, updateCharge, deleteCharge, getStoresWithCharges, getProductsWithCharges } = require("../../controllers/admin/chargeController");
 const { getAllProducts, getProductById } = require("../../controllers/shops/productController");
 const upload = require("../../middlewares/upload");
 
@@ -50,6 +50,7 @@ router.post("/charges", adminAuthMiddleware, createCharge);
 router.get("/charges", adminAuthMiddleware, getCharges);
 router.get("/charges/stores", adminAuthMiddleware, getStoresWithCharges);
 router.get("/charges/products", adminAuthMiddleware, getProductsWithCharges);
+router.get("/charges/:id", adminAuthMiddleware, getChargeById);
 router.put("/charges/:id", adminAuthMiddleware, updateCharge);
 router.delete("/charges/:id", adminAuthMiddleware, deleteCharge);
 
