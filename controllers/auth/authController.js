@@ -20,16 +20,9 @@ exports.sendOtp = async (req, res) => {
     if (!user) {
       return res.status(400).json({ success: false, error: "Please create an account first." });
     }
-    if (user.role === 'customer' && role === 'customer') {
-      return res.status(400).json({ success: false, error: "User does not have access to platform, please create a new account" });
+    if (user.role !== role) {
+      return res.status(400).json({ success: false, error: "User does not exist. Please create an account." });
     }
-    if (user.role === 'owner' && role === 'owner') {
-      return res.status(400).json({ success: false, error: "User does not have access to platform, please create a new account" });
-    }
-    if (user.role === 'staff' && role === 'staff') {
-      return res.status(400).json({ success: false, error: "User does not have access to platform, please create a new account" });
-    }
-
     // Fixed OTP for development, Random OTP for production
     let otp = "1234";
     if (config.env === "production") {

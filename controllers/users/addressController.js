@@ -5,8 +5,6 @@ exports.createAddress = async (req, res) => {
     try {
         const {
             label,
-            name,
-            phone,
             addressLine1,
             addressLine2,
             landmark,
@@ -26,8 +24,6 @@ exports.createAddress = async (req, res) => {
         const address = new Address({
             userId,
             label,
-            name,
-            phone,
             addressLine1,
             addressLine2,
             landmark,
