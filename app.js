@@ -23,7 +23,13 @@ app.use(morgan("dev"));
 
 // Configure CORS
 app.use(cors({
-  origin: config.allowedOrigins,
+  origin: function (origin, callback) {
+    if (!origin || config.allowedOrigins.includes('*') || config.allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 

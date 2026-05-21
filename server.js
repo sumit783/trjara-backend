@@ -10,7 +10,13 @@ const server = http.createServer(app);
 // Configure Allowed Origins for Socket.io
 const io = new Server(server, {
   cors: {
-    origin: config.allowedOrigins,
+    origin: function (origin, callback) {
+      if (!origin || config.allowedOrigins.includes('*') || config.allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true
   }

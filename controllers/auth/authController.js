@@ -12,7 +12,7 @@ const OTP_EXPIRY = 5 * 60 * 1000; // 5 minutes
 // Step 1a: Request OTP (For existing users / Login)
 exports.sendOtp = async (req, res) => {
   try {
-    const { phone,role } = req.body;
+    const { phone, role } = req.body;
     if (!phone || !role) return res.status(400).json({ error: "Phone and role are required" });
 
     let user = await User.findOne({ phone });
@@ -20,7 +20,13 @@ exports.sendOtp = async (req, res) => {
     if (!user) {
       return res.status(400).json({ success: false, error: "Please create an account first." });
     }
-    if(user.role !== role){
+    if (user.role === 'customer' && role === 'customer') {
+      return res.status(400).json({ success: false, error: "User does not have access to platform, please create a new account" });
+    }
+    if (user.role === 'owner' && role === 'owner') {
+      return res.status(400).json({ success: false, error: "User does not have access to platform, please create a new account" });
+    }
+    if (user.role === 'staff' && role === 'staff') {
       return res.status(400).json({ success: false, error: "User does not have access to platform, please create a new account" });
     }
 
@@ -67,7 +73,7 @@ exports.createAccount = async (req, res) => {
 
     if (user) {
       const field = user.phone === phone ? "phone number" : "email";
-      return res.status(400).json({success: false, error: `User already exists with this ${field}.` });
+      return res.status(400).json({ success: false, error: `User already exists with this ${field}.` });
     }
 
     user = new User({
@@ -89,6 +95,7 @@ exports.createAccount = async (req, res) => {
     await user.save();
     if (user.role === "customer") {
       user.isAdminVerified = "verified";
+      user.isActive = true;
       await user.save();
     }
 

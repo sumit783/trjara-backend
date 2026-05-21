@@ -15,17 +15,12 @@ const router = express.Router();
 
 // 1. Create Account (Signup)
 router.post("/create-account", otpRateLimiter, loggerMiddleware, validateRequest, createAccount);
-
-
 // 2. Send OTP (Login)
 router.post("/send-otp", otpRateLimiter, loggerMiddleware, validateRequest, sendOtp);
-
 // Verify OTP and login
 router.post("/verify-otp", rateLimitMiddleware, loggerMiddleware, validateRequest, verifyOtp);
-
 // Verify OTP for signup
 router.post("/verify-signup-otp", rateLimitMiddleware, loggerMiddleware, validateRequest, verifySignupOtp);
-
 // Logout user (invalidate session)
 router.post("/logout", rateLimitMiddleware, loggerMiddleware, validateRequest, logout);
 

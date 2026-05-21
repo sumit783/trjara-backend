@@ -134,3 +134,32 @@ exports.getAddresses = async (req, res) => {
         res.status(500).json({ success: false, message: "Server error", error: error.message });
     }
 };
+
+// Get Primary Address Label Only
+exports.getPrimaryAddressLabel = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const primaryAddress = await Address.findOne({ userId: userId, isDefault: true, isActive: true });
+
+        if (!primaryAddress) {
+            return res.json({
+                success: true,
+                message: "No primary address found",
+                data: null
+            });
+        }
+
+        res.json({
+            success: true,
+            message: "Primary address label fetched successfully",
+            data: {
+                label: primaryAddress.label
+            }
+        });
+    } catch (error) {
+        console.error("Error fetching primary address label:", error);
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+

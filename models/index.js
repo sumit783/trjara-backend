@@ -19,9 +19,10 @@ const Inventory = require("./shops/Inventory.js");
 const InventoryLog = require("./shops/InventoryLog.js");
 const QRCode = require("./shops/QRCode.js");
 const Charge = require("./charges/Charge.js");
+const COD = require("./charges/COD.js");
 const StoreDocument = require("./shops/StoreDocument.js");
 const StoreSettings = require("./shops/StoreSettings.js");
-const StoreTiming = require("./shops/storeTiming.js");
+const StoreTiming = require("./shops/StoreTiming.js");
 
 // ==========================
 // Order & Delivery Models
@@ -95,6 +96,7 @@ module.exports = {
   InventoryLog,
   QRCode,
   Charge,
+  COD,
   StoreDocument,
   StoreSettings,
   StoreTiming,

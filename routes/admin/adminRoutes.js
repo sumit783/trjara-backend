@@ -6,6 +6,7 @@ const { createVariantOption, getVariantOptions, updateVariantOption, deleteVaria
 const { getAllRiders, getRiderDocuments, verifyDocument } = require("../../controllers/delivery/adminRiderController");
 const { createVehicleType, getAllVehicleTypes, updateVehicleType, deleteVehicleType } = require("../../controllers/delivery/vehicleTypeController");
 const { createCharge, getCharges, getChargeById, updateCharge, deleteCharge, getStoresWithCharges, getProductsWithCharges } = require("../../controllers/admin/chargeController");
+const { createCODRule, getCODRules, getCODRuleById, updateCODRule, deleteCODRule, getStoresWithCODRules, getProductsWithCODRules, getInventoriesWithCODRules } = require("../../controllers/admin/codController");
 const { getAllProducts, getProductById } = require("../../controllers/shops/productController");
 const upload = require("../../middlewares/upload");
 
@@ -53,6 +54,16 @@ router.get("/charges/products", adminAuthMiddleware, getProductsWithCharges);
 router.get("/charges/:id", adminAuthMiddleware, getChargeById);
 router.put("/charges/:id", adminAuthMiddleware, updateCharge);
 router.delete("/charges/:id", adminAuthMiddleware, deleteCharge);
+
+// Admin-only: COD Rules (Global, Shop, Product, etc.)
+router.post("/cod-rules", adminAuthMiddleware, createCODRule);
+router.get("/cod-rules", adminAuthMiddleware, getCODRules);
+router.get("/cod-rules/stores", adminAuthMiddleware, getStoresWithCODRules);
+router.get("/cod-rules/products", adminAuthMiddleware, getProductsWithCODRules);
+router.get("/cod-rules/inventories", adminAuthMiddleware, getInventoriesWithCODRules);
+router.get("/cod-rules/:id", adminAuthMiddleware, getCODRuleById);
+router.put("/cod-rules/:id", adminAuthMiddleware, updateCODRule);
+router.delete("/cod-rules/:id", adminAuthMiddleware, deleteCODRule);
 
 // Admin-only: Products
 router.get("/products", adminAuthMiddleware, getAllProducts);

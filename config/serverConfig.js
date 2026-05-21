@@ -5,7 +5,7 @@ const config = {
     env: process.env.NODE_ENV || 'development',
     port: process.env.PORT || 5000,
     mongoUri: process.env.MONGO_URI,
-    allowedOrigins: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
+    allowedOrigins: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(url => url.trim()) : ['*'],
     jwtSecret: process.env.JWT_SECRET,
     supabase: {
         url: process.env.SUPABASE_URL,
