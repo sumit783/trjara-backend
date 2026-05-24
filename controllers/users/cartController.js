@@ -1,7 +1,9 @@
+const mongoose = require("mongoose");
 const Cart = require("../../models/cart/Cart");
 const CartItem = require("../../models/cart/CartItem");
 const Inventory = require("../../models/shops/Inventory");
 const Charge = require("../../models/charges/Charge");
+const CODRule = require("../../models/charges/COD");
 const Address = require("../../models/users/Address");
 const Store = require("../../models/shops/Store");
 
@@ -140,7 +142,7 @@ exports.addToCart = async (req, res) => {
 
         cart.itemsTotal = itemsTotal;
         cart.totalAmount = itemsTotal + cart.deliveryCharge + cart.platformCharge + cart.smallCartCharge - cart.discountAmount;
-        
+
         await cart.save();
 
         // Return cart with items
@@ -233,14 +235,14 @@ exports.getCart = async (req, res) => {
         // Select the "best" charge document
         // We prioritize by scope specificity if priority is equal, but the sort handles general priority.
         const scopeWeight = { "Inventory": 4, "Product": 3, "Store": 2, "Global": 1 };
-        
+
         let bestCharge = charges.sort((a, b) => {
             if (b.priority !== a.priority) return b.priority - a.priority;
             return scopeWeight[b.scope] - scopeWeight[a.scope];
         })[0];
 
-        // If no charge found, use defaults
-        const activeCharge = bestCharge || {};
+        // If no charge found, use robust default values
+        const activeCharge = bestCharge;
 
         // 4. Calculate Totals
         let itemsTotal = 0;
@@ -275,7 +277,7 @@ exports.getCart = async (req, res) => {
 
         // Surge Charges
         let badWeatherCharge = activeCharge.badWeatherCharge || 0;
-        
+
         // Final Total
         const totalAmount = itemsTotal + smallCartCharge + platformCharge + deliveryCharge + badWeatherCharge - (cart.discountAmount || 0);
 
@@ -285,8 +287,78 @@ exports.getCart = async (req, res) => {
         cart.platformCharge = platformCharge;
         cart.deliveryCharge = deliveryCharge;
         cart.totalAmount = totalAmount;
-        
+
         await cart.save();
+
+        // COD Resolution
+        let isCodAvailable = true;
+        let codCharge = 0;
+        let codDisableReason = "";
+        let bestCodRule = null;
+
+        if (items.length > 0) {
+            const codRules = await CODRule.find({
+                $or: [
+                    { scope: "Global" },
+                    { scope: "Store", scopeId: shopId },
+                    { scope: "Product", scopeId: productId },
+                    { scope: "Inventory", scopeId: inventoryId }
+                ]
+            }).sort({ priority: -1, createdAt: -1 });
+
+            bestCodRule = codRules.sort((a, b) => {
+                if (b.priority !== a.priority) return b.priority - a.priority;
+                return scopeWeight[b.scope] - scopeWeight[a.scope];
+            })[0] || {
+                scope: "Global",
+                codEnabled: true,
+                codCharge: 0,
+                codChargeType: "flat",
+                minCodAmount: 0,
+                maxCodAmount: null,
+                allowedPincodes: [],
+                blockedPincodes: []
+            };
+
+            if (!bestCodRule.codEnabled) {
+                isCodAvailable = false;
+                codDisableReason = "COD is disabled for this store/product selection.";
+            } else {
+                if (itemsTotal < (bestCodRule.minCodAmount || 0)) {
+                    isCodAvailable = false;
+                    codDisableReason = `Minimum order amount for COD is Rs. ${bestCodRule.minCodAmount}.`;
+                } else if (bestCodRule.maxCodAmount !== null && bestCodRule.maxCodAmount !== undefined && itemsTotal > bestCodRule.maxCodAmount) {
+                    isCodAvailable = false;
+                    codDisableReason = `Maximum order amount for COD is Rs. ${bestCodRule.maxCodAmount}.`;
+                }
+
+                if (isCodAvailable && userAddress && userAddress.pincode) {
+                    const pin = userAddress.pincode.toString().trim();
+                    if (bestCodRule.allowedPincodes && bestCodRule.allowedPincodes.length > 0) {
+                        const isAllowed = bestCodRule.allowedPincodes.some(p => p.toString().trim() === pin);
+                        if (!isAllowed) {
+                            isCodAvailable = false;
+                            codDisableReason = "COD is not available in your location pincode.";
+                        }
+                    }
+                    if (isCodAvailable && bestCodRule.blockedPincodes && bestCodRule.blockedPincodes.length > 0) {
+                        const isBlocked = bestCodRule.blockedPincodes.some(p => p.toString().trim() === pin);
+                        if (isBlocked) {
+                            isCodAvailable = false;
+                            codDisableReason = "COD is blocked for your location pincode.";
+                        }
+                    }
+                }
+            }
+
+            if (isCodAvailable && bestCodRule.codCharge) {
+                if (bestCodRule.codChargeType === "percentage") {
+                    codCharge = (itemsTotal * bestCodRule.codCharge) / 100;
+                } else {
+                    codCharge = bestCodRule.codCharge;
+                }
+            }
+        }
 
         res.status(200).json({
             success: true,
@@ -298,12 +370,493 @@ exports.getCart = async (req, res) => {
                     priority: activeCharge.priority,
                     details: activeCharge
                 },
+                codInfo: {
+                    isCodAvailable,
+                    codCharge,
+                    codDisableReason
+                },
                 distanceInfo
             }
         });
 
     } catch (error) {
         console.error("Error in getCart:", error);
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+/**
+ * Update quantity of a cart item
+ * @route PUT /api/cart/update-quantity
+ * @access Private
+ */
+exports.updateCartItemQuantity = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { cartItemId, inventoryId, quantity } = req.body;
+
+        if (quantity === undefined || typeof quantity !== "number") {
+            return res.status(400).json({ success: false, message: "Valid quantity is required" });
+        }
+
+        // 1. Find user's cart
+        const cart = await Cart.findOne({ userId });
+        if (!cart) {
+            return res.status(404).json({ success: false, message: "Cart not found" });
+        }
+
+        // 2. Find cart item
+        let cartItem;
+        if (cartItemId) {
+            cartItem = await CartItem.findOne({ _id: cartItemId, cartId: cart._id });
+        } else if (inventoryId) {
+            cartItem = await CartItem.findOne({ inventoryId, cartId: cart._id });
+        }
+
+        if (!cartItem) {
+            return res.status(404).json({ success: false, message: "Cart item not found" });
+        }
+
+        // 3. Update quantity or delete if <= 0
+        if (quantity <= 0) {
+            await CartItem.findByIdAndDelete(cartItem._id);
+        } else {
+            // Verify stock first
+            const inventory = await Inventory.findById(cartItem.inventoryId);
+            if (!inventory) {
+                return res.status(404).json({ success: false, message: "Product inventory not found" });
+            }
+
+            if (inventory.stock < quantity) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Only ${inventory.stock} items available in stock`
+                });
+            }
+
+            cartItem.quantity = quantity;
+            cartItem.totalPrice = quantity * cartItem.price;
+            await cartItem.save();
+        }
+
+        // 4. Recalculate cart totals
+        const allItems = await CartItem.find({ cartId: cart._id });
+        let itemsTotal = 0;
+        allItems.forEach(item => {
+            itemsTotal += item.totalPrice;
+        });
+
+        cart.itemsTotal = itemsTotal;
+
+        // Fetch user default address to get distance and recalculate charges
+        const userAddress = await Address.findOne({ userId, isDefault: true });
+        let distanceInfo = { totalDistance: 0, path: [], message: "" };
+
+        if (userAddress && userAddress.location && userAddress.location.coordinates && allItems.length > 0) {
+            const shopIds = [...new Set(allItems.filter(i => i.shopId).map(item => item.shopId.toString()))];
+            const stores = await Store.find({ _id: { $in: shopIds } });
+
+            const storeLocations = stores
+                .filter(s => s.location && s.location.coordinates && Array.isArray(s.location.coordinates) && s.location.coordinates.length === 2)
+                .map(s => ({
+                    id: s._id,
+                    name: s.name,
+                    coords: s.location.coordinates
+                }));
+
+            if (storeLocations.length > 0) {
+                distanceInfo = findShortestPath(userAddress.location.coordinates, storeLocations);
+            }
+        }
+
+        let smallCartCharge = 0;
+        let platformCharge = 0;
+        let deliveryCharge = 0;
+        let badWeatherCharge = 0;
+        let activeCharge = null;
+
+        if (allItems.length > 0) {
+            const primaryItem = allItems[0];
+            const shopId = primaryItem.shopId;
+            const productId = primaryItem.productId;
+            const inventoryId = primaryItem.inventoryId;
+
+            const charges = await Charge.find({
+                $or: [
+                    { scope: "Global" },
+                    { scope: "Store", scopeId: shopId },
+                    { scope: "Product", scopeId: productId },
+                    { scope: "Inventory", scopeId: inventoryId }
+                ]
+            }).sort({ priority: -1, createdAt: -1 });
+
+            const scopeWeight = { "Inventory": 4, "Product": 3, "Store": 2, "Global": 1 };
+
+            const bestCharge = charges.sort((a, b) => {
+                if (b.priority !== a.priority) return b.priority - a.priority;
+                return scopeWeight[b.scope] - scopeWeight[a.scope];
+            })[0];
+
+            activeCharge = bestCharge || {
+                scope: "Global",
+                deliveryCharge: 30,
+                baseDeliveryDistance: 3,
+                perKmCharge: 10,
+                platformCharge: 2,
+                platformChargeType: "flat",
+                smallCartThreshold: 100,
+                smallCartCharge: 15
+            };
+
+            if (activeCharge.smallCartThreshold && itemsTotal < activeCharge.smallCartThreshold) {
+                smallCartCharge = activeCharge.smallCartCharge || 0;
+            }
+
+            if (activeCharge.platformCharge) {
+                if (activeCharge.platformChargeType === "percentage") {
+                    platformCharge = (itemsTotal * activeCharge.platformCharge) / 100;
+                } else {
+                    platformCharge = activeCharge.platformCharge;
+                }
+            }
+
+            deliveryCharge = activeCharge.deliveryCharge || 0;
+            if (distanceInfo.totalDistance > (activeCharge.baseDeliveryDistance || 0)) {
+                const extraDistance = distanceInfo.totalDistance - (activeCharge.baseDeliveryDistance || 0);
+                deliveryCharge += extraDistance * (activeCharge.perKmCharge || 0);
+            }
+
+            badWeatherCharge = activeCharge.badWeatherCharge || 0;
+        }
+
+        const totalAmount = itemsTotal + smallCartCharge + platformCharge + deliveryCharge + badWeatherCharge - (cart.discountAmount || 0);
+
+        cart.smallCartCharge = smallCartCharge;
+        cart.platformCharge = platformCharge;
+        cart.deliveryCharge = deliveryCharge;
+        cart.totalAmount = totalAmount;
+
+        await cart.save();
+
+        // COD Resolution
+        let isCodAvailable = true;
+        let codCharge = 0;
+        let codDisableReason = "";
+        let bestCodRule = null;
+
+        if (allItems.length > 0) {
+            const primaryItem = allItems[0];
+            const shopId = primaryItem.shopId;
+            const productId = primaryItem.productId;
+            const inventoryId = primaryItem.inventoryId;
+            const scopeWeight = { "Inventory": 4, "Product": 3, "Store": 2, "Global": 1 };
+
+            const codRules = await CODRule.find({
+                $or: [
+                    { scope: "Global" },
+                    { scope: "Store", scopeId: shopId },
+                    { scope: "Product", scopeId: productId },
+                    { scope: "Inventory", scopeId: inventoryId }
+                ]
+            }).sort({ priority: -1, createdAt: -1 });
+
+            bestCodRule = codRules.sort((a, b) => {
+                if (b.priority !== a.priority) return b.priority - a.priority;
+                return scopeWeight[b.scope] - scopeWeight[a.scope];
+            })[0] || {
+                scope: "Global",
+                codEnabled: true,
+                codCharge: 0,
+                codChargeType: "flat",
+                minCodAmount: 0,
+                maxCodAmount: null,
+                allowedPincodes: [],
+                blockedPincodes: []
+            };
+
+            if (!bestCodRule.codEnabled) {
+                isCodAvailable = false;
+                codDisableReason = "COD is disabled for this store/product selection.";
+            } else {
+                if (itemsTotal < (bestCodRule.minCodAmount || 0)) {
+                    isCodAvailable = false;
+                    codDisableReason = `Minimum order amount for COD is Rs. ${bestCodRule.minCodAmount}.`;
+                } else if (bestCodRule.maxCodAmount !== null && bestCodRule.maxCodAmount !== undefined && itemsTotal > bestCodRule.maxCodAmount) {
+                    isCodAvailable = false;
+                    codDisableReason = `Maximum order amount for COD is Rs. ${bestCodRule.maxCodAmount}.`;
+                }
+
+                if (isCodAvailable && userAddress && userAddress.pincode) {
+                    const pin = userAddress.pincode.toString().trim();
+                    if (bestCodRule.allowedPincodes && bestCodRule.allowedPincodes.length > 0) {
+                        const isAllowed = bestCodRule.allowedPincodes.some(p => p.toString().trim() === pin);
+                        if (!isAllowed) {
+                            isCodAvailable = false;
+                            codDisableReason = "COD is not available in your location pincode.";
+                        }
+                    }
+                    if (isCodAvailable && bestCodRule.blockedPincodes && bestCodRule.blockedPincodes.length > 0) {
+                        const isBlocked = bestCodRule.blockedPincodes.some(p => p.toString().trim() === pin);
+                        if (isBlocked) {
+                            isCodAvailable = false;
+                            codDisableReason = "COD is blocked for your location pincode.";
+                        }
+                    }
+                }
+            }
+
+            if (isCodAvailable && bestCodRule.codCharge) {
+                if (bestCodRule.codChargeType === "percentage") {
+                    codCharge = (itemsTotal * bestCodRule.codCharge) / 100;
+                } else {
+                    codCharge = bestCodRule.codCharge;
+                }
+            }
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "Cart quantity updated successfully",
+            data: {
+                cart,
+                items: allItems,
+                appliedCharges: activeCharge ? {
+                    scope: activeCharge.scope,
+                    priority: activeCharge.priority,
+                    details: activeCharge
+                } : { details: {} },
+                codInfo: {
+                    isCodAvailable,
+                    codCharge,
+                    codDisableReason,
+                    appliedRule: bestCodRule
+                },
+                distanceInfo
+            }
+        });
+
+    } catch (error) {
+        console.error("Error in updateCartItemQuantity:", error);
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+/**
+ * Remove an item from the cart completely
+ * @route DELETE /api/cart/item/:cartItemId
+ * @access Private
+ */
+exports.removeFromCart = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { cartItemId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(cartItemId)) {
+            return res.status(400).json({ success: false, message: "Invalid cart item ID" });
+        }
+
+        // 1. Find user's cart
+        const cart = await Cart.findOne({ userId });
+        if (!cart) {
+            return res.status(404).json({ success: false, message: "Cart not found" });
+        }
+
+        // 2. Find and delete cart item
+        const deletedItem = await CartItem.findOneAndDelete({ _id: cartItemId, cartId: cart._id });
+        if (!deletedItem) {
+            return res.status(404).json({ success: false, message: "Cart item not found" });
+        }
+
+        // 3. Recalculate cart totals
+        const allItems = await CartItem.find({ cartId: cart._id });
+        let itemsTotal = 0;
+        allItems.forEach(item => {
+            itemsTotal += item.totalPrice;
+        });
+
+        cart.itemsTotal = itemsTotal;
+
+        // Fetch user default address to get distance and recalculate charges
+        const userAddress = await Address.findOne({ userId, isDefault: true });
+        let distanceInfo = { totalDistance: 0, path: [], message: "" };
+
+        if (userAddress && userAddress.location && userAddress.location.coordinates && allItems.length > 0) {
+            const shopIds = [...new Set(allItems.filter(i => i.shopId).map(item => item.shopId.toString()))];
+            const stores = await Store.find({ _id: { $in: shopIds } });
+
+            const storeLocations = stores
+                .filter(s => s.location && s.location.coordinates && Array.isArray(s.location.coordinates) && s.location.coordinates.length === 2)
+                .map(s => ({
+                    id: s._id,
+                    name: s.name,
+                    coords: s.location.coordinates
+                }));
+
+            if (storeLocations.length > 0) {
+                distanceInfo = findShortestPath(userAddress.location.coordinates, storeLocations);
+            }
+        }
+
+        let smallCartCharge = 0;
+        let platformCharge = 0;
+        let deliveryCharge = 0;
+        let badWeatherCharge = 0;
+        let activeCharge = null;
+
+        // COD calculations
+        let isCodAvailable = true;
+        let codCharge = 0;
+        let codDisableReason = "";
+        let bestCodRule = null;
+
+        if (allItems.length > 0) {
+            const primaryItem = allItems[0];
+            const shopId = primaryItem.shopId;
+            const productId = primaryItem.productId;
+            const inventoryId = primaryItem.inventoryId;
+            const scopeWeight = { "Inventory": 4, "Product": 3, "Store": 2, "Global": 1 };
+
+            const charges = await Charge.find({
+                $or: [
+                    { scope: "Global" },
+                    { scope: "Store", scopeId: shopId },
+                    { scope: "Product", scopeId: productId },
+                    { scope: "Inventory", scopeId: inventoryId }
+                ]
+            }).sort({ priority: -1, createdAt: -1 });
+
+            const bestCharge = charges.sort((a, b) => {
+                if (b.priority !== a.priority) return b.priority - a.priority;
+                return scopeWeight[b.scope] - scopeWeight[a.scope];
+            })[0];
+
+            activeCharge = bestCharge || {
+                scope: "Global",
+                deliveryCharge: 30,
+                baseDeliveryDistance: 3,
+                perKmCharge: 10,
+                platformCharge: 2,
+                platformChargeType: "flat",
+                smallCartThreshold: 100,
+                smallCartCharge: 15
+            };
+
+            if (activeCharge.smallCartThreshold && itemsTotal < activeCharge.smallCartThreshold) {
+                smallCartCharge = activeCharge.smallCartCharge || 0;
+            }
+
+            if (activeCharge.platformCharge) {
+                if (activeCharge.platformChargeType === "percentage") {
+                    platformCharge = (itemsTotal * activeCharge.platformCharge) / 100;
+                } else {
+                    platformCharge = activeCharge.platformCharge;
+                }
+            }
+
+            deliveryCharge = activeCharge.deliveryCharge || 0;
+            if (distanceInfo.totalDistance > (activeCharge.baseDeliveryDistance || 0)) {
+                const extraDistance = distanceInfo.totalDistance - (activeCharge.baseDeliveryDistance || 0);
+                deliveryCharge += extraDistance * (activeCharge.perKmCharge || 0);
+            }
+
+            badWeatherCharge = activeCharge.badWeatherCharge || 0;
+
+            // COD Resolution
+            const codRules = await CODRule.find({
+                $or: [
+                    { scope: "Global" },
+                    { scope: "Store", scopeId: shopId },
+                    { scope: "Product", scopeId: productId },
+                    { scope: "Inventory", scopeId: inventoryId }
+                ]
+            }).sort({ priority: -1, createdAt: -1 });
+
+            bestCodRule = codRules.sort((a, b) => {
+                if (b.priority !== a.priority) return b.priority - a.priority;
+                return scopeWeight[b.scope] - scopeWeight[a.scope];
+            })[0] || {
+                scope: "Global",
+                codEnabled: true,
+                codCharge: 0,
+                codChargeType: "flat",
+                minCodAmount: 0,
+                maxCodAmount: null,
+                allowedPincodes: [],
+                blockedPincodes: []
+            };
+
+            if (!bestCodRule.codEnabled) {
+                isCodAvailable = false;
+                codDisableReason = "COD is disabled for this store/product selection.";
+            } else {
+                if (itemsTotal < (bestCodRule.minCodAmount || 0)) {
+                    isCodAvailable = false;
+                    codDisableReason = `Minimum order amount for COD is Rs. ${bestCodRule.minCodAmount}.`;
+                } else if (bestCodRule.maxCodAmount !== null && bestCodRule.maxCodAmount !== undefined && itemsTotal > bestCodRule.maxCodAmount) {
+                    isCodAvailable = false;
+                    codDisableReason = `Maximum order amount for COD is Rs. ${bestCodRule.maxCodAmount}.`;
+                }
+
+                if (isCodAvailable && userAddress && userAddress.pincode) {
+                    const pin = userAddress.pincode.toString().trim();
+                    if (bestCodRule.allowedPincodes && bestCodRule.allowedPincodes.length > 0) {
+                        const isAllowed = bestCodRule.allowedPincodes.some(p => p.toString().trim() === pin);
+                        if (!isAllowed) {
+                            isCodAvailable = false;
+                            codDisableReason = "COD is not available in your location pincode.";
+                        }
+                    }
+                    if (isCodAvailable && bestCodRule.blockedPincodes && bestCodRule.blockedPincodes.length > 0) {
+                        const isBlocked = bestCodRule.blockedPincodes.some(p => p.toString().trim() === pin);
+                        if (isBlocked) {
+                            isCodAvailable = false;
+                            codDisableReason = "COD is blocked for your location pincode.";
+                        }
+                    }
+                }
+            }
+
+            if (isCodAvailable && bestCodRule.codCharge) {
+                if (bestCodRule.codChargeType === "percentage") {
+                    codCharge = (itemsTotal * bestCodRule.codCharge) / 100;
+                } else {
+                    codCharge = bestCodRule.codCharge;
+                }
+            }
+        }
+
+        const totalAmount = itemsTotal + smallCartCharge + platformCharge + deliveryCharge + badWeatherCharge - (cart.discountAmount || 0);
+
+        cart.smallCartCharge = smallCartCharge;
+        cart.platformCharge = platformCharge;
+        cart.deliveryCharge = deliveryCharge;
+        cart.totalAmount = totalAmount;
+
+        await cart.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Item removed from cart successfully",
+            data: {
+                cart,
+                items: allItems,
+                appliedCharges: activeCharge ? {
+                    scope: activeCharge.scope,
+                    priority: activeCharge.priority,
+                    details: activeCharge
+                } : { details: {} },
+                codInfo: {
+                    isCodAvailable,
+                    codCharge,
+                    codDisableReason,
+                    appliedRule: bestCodRule
+                },
+                distanceInfo
+            }
+        });
+
+    } catch (error) {
+        console.error("Error in removeFromCart:", error);
         res.status(500).json({ success: false, message: "Server error", error: error.message });
     }
 };

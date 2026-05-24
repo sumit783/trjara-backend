@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const User = require("../../models/users/User");
 const AnalyticsEvent = require("../../models/logs/AnalyticsEvent");
 const config = require("../../config/serverConfig");
@@ -208,6 +209,195 @@ exports.getTopStoreLogos = async (req, res) => {
 };
 
 /**
+ * Get list of active store details for customer
+ * @route GET /api/customer/stores
+ * @access Public
+ */
+exports.getStoresList = async (req, res) => {
+    try {
+        const { search, category, page = 1, limit = 10 } = req.query;
+        let query = { isActive: true };
+
+        if (search) {
+            query.name = { $regex: search, $options: 'i' };
+        }
+
+        if (category) {
+            query.category = category;
+        }
+
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        const stores = await Store.find(query)
+            .populate("category", "name image")
+            .select("name logo category isActive")
+            .skip(skip)
+            .limit(parseInt(limit))
+            .sort({ name: 1 });
+
+        const total = await Store.countDocuments(query);
+
+        // Fetch counts for all stores in parallel
+        const storesList = await Promise.all(
+            stores.map(async (store) => {
+                const uniqueProducts = await Inventory.distinct("product", {
+                    store: store._id,
+                    isAvailable: true,
+                    stock: { $gt: 0 }
+                });
+                const productCount = uniqueProducts.length;
+
+                return {
+                    id: store._id,
+                    name: store.name,
+                    logo: store.logo || "",
+                    categories: store.category ? store.category.map(cat => ({
+                        id: cat._id,
+                        name: cat.name,
+                        image: cat.image || ""
+                    })) : [],
+                    productCount
+                };
+            })
+        );
+
+        res.status(200).json({
+            success: true,
+            data: storesList,
+            pagination: {
+                total,
+                page: parseInt(page),
+                limit: parseInt(limit),
+                totalPages: Math.ceil(total / parseInt(limit))
+            }
+        });
+    } catch (error) {
+        console.error("Error fetching stores list:", error);
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+/**
+ * Get active store details by ID for customer
+ * @route GET /api/customer/stores/:id
+ * @access Public
+ */
+exports.getStoreById = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ success: false, message: "Invalid store ID" });
+        }
+
+        const store = await Store.findOne({ _id: id, isActive: true })
+            .populate("category", "name image");
+
+        if (!store) {
+            return res.status(404).json({ success: false, message: "Store not found or inactive" });
+        }
+
+        // Fetch all in-stock inventories for this store
+        const inventories = await Inventory.find({
+            store: store._id,
+            isAvailable: true,
+            stock: { $gt: 0 }
+        })
+        .populate({
+            path: 'product',
+            populate: { path: 'category', select: 'name slug image parent' }
+        })
+        .sort({ _id: -1 });
+
+        const seenProducts = new Set();
+        const productsList = [];
+        const subcategoriesMap = new Map();
+
+        for (const inv of inventories) {
+            // Collect categories where products are present
+            if (inv.product && inv.product.category) {
+                const cat = inv.product.category;
+                if (cat._id) {
+                    const catIdStr = cat._id.toString();
+                    if (!subcategoriesMap.has(catIdStr)) {
+                        subcategoriesMap.set(catIdStr, {
+                            id: cat._id,
+                            name: cat.name,
+                            slug: cat.slug || "",
+                            image: cat.image || "",
+                            parent: cat.parent || null
+                        });
+                    }
+                }
+            }
+
+            const productId = inv.product ? inv.product._id.toString() : inv._id.toString();
+            if (!seenProducts.has(productId)) {
+                seenProducts.add(productId);
+
+                const rating = (Math.random() * (5 - 3.5) + 3.5).toFixed(1);
+                let discount = 0;
+                if (inv.mrp && inv.price && inv.mrp > inv.price) {
+                    discount = Math.round(((inv.mrp - inv.price) / inv.mrp) * 100);
+                }
+
+                const categoryName = inv.product && inv.product.category && inv.product.category.name
+                                        ? inv.product.category.name
+                                        : 'General';
+
+                const images = inv.productImages && inv.productImages.length > 0
+                                    ? inv.productImages
+                                    : (inv.product && inv.product.images ? inv.product.images : []);
+
+                productsList.push({
+                    id: inv._id,
+                    name: inv.productName || (inv.product ? inv.product.name : 'Unknown Product'),
+                    images: images,
+                    price: inv.price,
+                    mrp: inv.mrp || inv.price,
+                    discount: discount,
+                    rating: parseFloat(rating),
+                    category: categoryName
+                });
+            }
+        }
+
+        const subcategoriesList = Array.from(subcategoriesMap.values());
+
+        const storeDetails = {
+            id: store._id,
+            name: store.name,
+            logo: store.logo || "",
+            banner: store.banner || "",
+            phone: store.phone || "",
+            email: store.email || "",
+            description: store.description || "",
+            address: store.address || "",
+            city: store.city || "",
+            state: store.state || "",
+            pincode: store.pincode || "",
+            categories: store.category ? store.category.map(cat => ({
+                id: cat._id,
+                name: cat.name,
+                image: cat.image || ""
+            })) : [],
+            subcategories: subcategoriesList,
+            productCount: productsList.length,
+            products: productsList
+        };
+
+        res.status(200).json({
+            success: true,
+            data: storeDetails
+        });
+    } catch (error) {
+        console.error("Error fetching store details:", error);
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+
+/**
  * Get product sections for home page
  * @route GET /api/customer/home-sections
  * @access Private/Public
@@ -246,6 +436,8 @@ exports.getHomeSections = async (req, res) => {
 
                 formattedProducts.push({
                     id: inv._id,
+                    inventoryId: inv._id,
+                    productId: inv.product ? (inv.product._id || inv.product) : null,
                     name: inv.productName || (inv.product ? inv.product.name : 'Unknown Product'),
                     images: images,
                     price: inv.price,
@@ -319,6 +511,8 @@ const fetchAndFormatProducts = async (limit = 10) => {
 
             formattedProducts.push({
                 id: inv._id,
+                inventoryId: inv._id,
+                productId: inv.product ? (inv.product._id || inv.product) : null,
                 name: inv.productName || (inv.product ? inv.product.name : 'Unknown Product'),
                 images: images,
                 price: inv.price,
@@ -478,6 +672,8 @@ exports.getProductsByCategory = async (req, res) => {
 
                 formattedProducts.push({
                     id: inv._id,
+                    inventoryId: inv._id,
+                    productId: inv.product ? (inv.product._id || inv.product) : null,
                     name: inv.productName || (inv.product ? inv.product.name : 'Unknown Product'),
                     images: images,
                     price: inv.price,

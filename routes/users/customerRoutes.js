@@ -8,6 +8,8 @@ const {
     sendPhoneOTP, 
     verifyPhoneOTP, 
     getTopStoreLogos, 
+    getStoresList,
+    getStoreById,
     getHomeSections,
     getTopPicks,
     getFreshHealthy,
@@ -33,6 +35,8 @@ router.get("/sections/weekly-deals", getWeeklyDeals);
 router.get("/sections/best-sellers", getBestSellers);
 router.get("/sections/new-arrivals", getNewArrivals);
 router.get("/top-store-logos", getTopStoreLogos);
+router.get("/stores", getStoresList);
+router.get("/stores/:id", getStoreById);
 router.get("/primary-categories", getPrimaryCategories);
 router.get("/category/:categoryId/products", getProductsByCategory);
 router.get("/products/:id", getProductDetails);
