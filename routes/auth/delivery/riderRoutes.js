@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { createProfile, getProfile, uploadDocument, getDocuments, updateStatus } = require("../../../controllers/delivery/riderController");
+const { createProfile, getProfile, uploadDocument, getDocuments, updateStatus, getVerificationStatus } = require("../../../controllers/delivery/riderController");
 const authMiddleware = require("../../../middlewares/authMiddleware");
 const upload = require("../../../middlewares/upload");
 
@@ -15,6 +15,10 @@ router.post("/profile", createProfile);
 // @desc    Get rider profile
 router.get("/profile", getProfile);
 
+// @route   GET /api/rider/verification-status
+// @desc    Get rider verification status in sequence
+router.get("/verification-status", getVerificationStatus);
+
 // @route   POST /api/rider/documents
 // @desc    Upload rider document
 router.post("/documents", upload.single("document"), uploadDocument);
@@ -28,3 +32,4 @@ router.get("/documents", getDocuments);
 router.patch("/status", updateStatus);
 
 module.exports = router;
+

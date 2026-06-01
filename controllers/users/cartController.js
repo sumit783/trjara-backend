@@ -145,13 +145,22 @@ exports.addToCart = async (req, res) => {
 
         await cart.save();
 
+        // Populate items with variant details before sending response
+        const populatedItems = await CartItem.populate(allItems, [
+            { path: "productId" },
+            {
+                path: "inventoryId",
+                populate: { path: "variant" }
+            }
+        ]);
+
         // Return cart with items
         res.status(200).json({
             success: true,
             message: "Cart updated successfully",
             data: {
                 cart,
-                items: allItems
+                items: populatedItems
             }
         });
 
@@ -190,7 +199,7 @@ exports.getCart = async (req, res) => {
         // 2. Calculate Distance and Path
         // 2.1 Get User's default address
         const userAddress = await Address.findOne({ userId, isDefault: true });
-        let distanceInfo = { totalDistance: 0, path: [], message: "" };
+        let distanceInfo = { totalDistance: 0, path: [], deliveryTime: 0, message: "" };
 
         if (userAddress && userAddress.location && userAddress.location.coordinates) {
             // 2.2 Get unique shop addresses
@@ -207,6 +216,10 @@ exports.getCart = async (req, res) => {
 
             if (storeLocations.length > 0) {
                 distanceInfo = findShortestPath(userAddress.location.coordinates, storeLocations);
+                
+                // Calculate delivery time: max averagePackingTime + totalDistance * 2
+                const maxPackingTime = Math.max(...stores.map(s => typeof s.averagePackingTime === 'number' ? s.averagePackingTime : 5));
+                distanceInfo.deliveryTime = Math.round(maxPackingTime + (distanceInfo.totalDistance * 2));
             } else {
                 distanceInfo.message = "No store locations found";
             }
@@ -360,11 +373,20 @@ exports.getCart = async (req, res) => {
             }
         }
 
+        // Populate items with variant details before sending response
+        const populatedItems = await CartItem.populate(items, [
+            { path: "productId" },
+            {
+                path: "inventoryId",
+                populate: { path: "variant" }
+            }
+        ]);
+
         res.status(200).json({
             success: true,
             data: {
                 cart,
-                items,
+                items: populatedItems,
                 appliedCharges: {
                     scope: activeCharge.scope,
                     priority: activeCharge.priority,
@@ -614,12 +636,21 @@ exports.updateCartItemQuantity = async (req, res) => {
             }
         }
 
+        // Populate items with variant details before sending response
+        const populatedItems = await CartItem.populate(allItems, [
+            { path: "productId" },
+            {
+                path: "inventoryId",
+                populate: { path: "variant" }
+            }
+        ]);
+
         res.status(200).json({
             success: true,
             message: "Cart quantity updated successfully",
             data: {
                 cart,
-                items: allItems,
+                items: populatedItems,
                 appliedCharges: activeCharge ? {
                     scope: activeCharge.scope,
                     priority: activeCharge.priority,
@@ -834,12 +865,21 @@ exports.removeFromCart = async (req, res) => {
 
         await cart.save();
 
+        // Populate items with variant details before sending response
+        const populatedItems = await CartItem.populate(allItems, [
+            { path: "productId" },
+            {
+                path: "inventoryId",
+                populate: { path: "variant" }
+            }
+        ]);
+
         res.status(200).json({
             success: true,
             message: "Item removed from cart successfully",
             data: {
                 cart,
-                items: allItems,
+                items: populatedItems,
                 appliedCharges: activeCharge ? {
                     scope: activeCharge.scope,
                     priority: activeCharge.priority,

@@ -82,6 +82,10 @@ const storeSchema = new mongoose.Schema(
     addharNumber: {
       type: String
     },
+    averagePackingTime: {
+      type: Number,
+      default: 5
+    },
     adminVerificationStatus: {
       type: String,
       enum: ["pending", "verified", "rejected", "reuploaded"],

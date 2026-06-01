@@ -204,3 +204,107 @@ exports.updateStatus = async (req, res) => {
         res.status(500).json({ error: "Server error" });
     }
 };
+
+// @desc    Get rider verification status in sequence
+// @route   GET /api/rider/verification-status
+// @access  Private (Rider only)
+exports.getVerificationStatus = async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id);
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        const rider = await User.findOne({ _id: req.user.id });
+        if (!rider) {
+            return res.status(404).json({ error: "Rider profile not found. Please create a profile first." });
+        }
+
+        // Fetch all documents for this rider
+        const documents = await RiderDocument.find({ rider: rider._id });
+
+        // Define the sequence of steps
+        const stepsSeq = ["user_details", "profile_photo", "aadhar", "pan", "driving_license"];
+
+        // 1. User details step
+        let userDetailsStatus = "pending";
+        if (user.isAdminVerified === "verified") {
+            userDetailsStatus = "approved";
+        } else if (user.isAdminVerified === "rejected") {
+            userDetailsStatus = "rejected";
+        } else if (user.isAdminVerified === "reuploaded") {
+            userDetailsStatus = "reuploaded";
+        }
+
+        const userDetailsStep = {
+            step: "user_details",
+            label: "User Details",
+            status: userDetailsStatus,
+            remark: user.adminNote || "",
+            data: {
+                name: user.name,
+                email: user.email,
+                phone: user.phone
+            }
+        };
+
+        // Helper to find document and format its step
+        const getDocStep = (type, label) => {
+            const doc = documents.find(d => d.documentType === type);
+            if (!doc) {
+                return {
+                    step: type,
+                    label,
+                    status: "not_uploaded",
+                    remark: "",
+                    documentImage: "",
+                    verifiedAt: null
+                };
+            }
+            return {
+                step: type,
+                label,
+                status: doc.verificationStatus === "approved" ? "approved" : doc.verificationStatus,
+                remark: doc.remark || "",
+                documentImage: doc.documentImage || "",
+                verifiedAt: doc.verifiedAt || null
+            };
+        };
+
+        const profilePhotoStep = getDocStep("profile_photo", "Profile Photo");
+        const aadharStep = getDocStep("aadhar", "Aadhar Card");
+        const panStep = getDocStep("pan", "PAN Card");
+        const drivingLicenseStep = getDocStep("driving_license", "Driving License");
+
+        const steps = [
+            userDetailsStep,
+            profilePhotoStep,
+            aadharStep,
+            panStep,
+            drivingLicenseStep
+        ];
+
+        // Determine current step in the sequence
+        let currentStep = "completed";
+        for (const stepObj of steps) {
+            if (stepObj.status !== "approved") {
+                currentStep = stepObj.step;
+                break;
+            }
+        }
+
+        res.json({
+            success: true,
+            data: {
+                isVerified: rider.isVerified,
+                verificationStatus: rider.verificationStatus,
+                currentStep,
+                steps
+            }
+        });
+    } catch (err) {
+        console.error("Error in getVerificationStatus:", err);
+        res.status(500).json({ error: "Server error" });
+    }
+};
+

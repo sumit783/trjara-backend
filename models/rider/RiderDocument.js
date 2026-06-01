@@ -14,7 +14,6 @@ const riderDocumentSchema = new mongoose.Schema(
       "aadhar",
       "pan",
       "driving_license",
-      "police_verification",
       "profile_photo"
     ],
     required: true

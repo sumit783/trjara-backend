@@ -5,7 +5,6 @@ const morgan = require("morgan");
 const config = require("./config/serverConfig");
 const userAuthRoutes = require("./routes/auth/userAuthRoutes");
 const adminAuthRoutes = require("./routes/auth/adminAuthRoutes");
-
 const adminRoutes = require("./routes/admin/adminRoutes");
 const shopsRoutes = require("./routes/shops/Shop.js");
 const productsRoutes = require("./routes/shops/productRoutes.js");
@@ -14,9 +13,11 @@ const customerRoutes = require("./routes/users/customerRoutes");
 const riderRoutes = require("./routes/auth/delivery/riderRoutes.js");
 const ownerRoutes = require("./routes/shops/ownerRoutes");
 const cartRoutes = require("./routes/users/cartRoutes");
+const orderRoutes = require("./routes/users/orderRoutes");
 const errorHandler = require("./middlewares/errorHandler");
 
 const app = express();
+
 
 // Use morgan for request logging
 app.use(morgan("dev"));
@@ -52,6 +53,7 @@ app.use("/api/customer", customerRoutes);
 app.use("/api/rider", riderRoutes);
 app.use("/api/owner", ownerRoutes);
 app.use("/api/cart", cartRoutes);
+app.use("/api/orders", orderRoutes);
 
 // Error Handling
 app.use(errorHandler);

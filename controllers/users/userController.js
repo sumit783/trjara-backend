@@ -156,6 +156,36 @@ exports.verifyUser = async (req, res) => {
 
     await user.save();
 
+    // Synchronize Rider verification status if a Rider profile exists
+    try {
+      const Rider = require("../../models/rider/Rider");
+      const RiderDocument = require("../../models/rider/RiderDocument");
+
+      const rider = await Rider.findOne({ user: id });
+      if (rider) {
+        if (status === "verified") {
+          const mandatoryDocs = ["profile_photo", "aadhar", "pan", "driving_license"];
+          const allDocs = await RiderDocument.find({ rider: rider._id });
+          const verifiedDocTypes = allDocs
+            .filter(doc => doc.verificationStatus === "approved")
+            .map(doc => doc.documentType);
+
+          const allDocsApproved = mandatoryDocs.every(type => verifiedDocTypes.includes(type));
+          if (allDocsApproved) {
+            rider.verificationStatus = "verified";
+            rider.isVerified = true;
+            await rider.save();
+          }
+        } else if (status === "rejected") {
+          rider.verificationStatus = "rejected";
+          rider.isVerified = false;
+          await rider.save();
+        }
+      }
+    } catch (syncError) {
+      console.error("Error syncing rider verification status on user verify:", syncError);
+    }
+
     res.status(200).json({
       success: true,
       message: `User verification status updated to ${status}`,
@@ -170,3 +200,4 @@ exports.verifyUser = async (req, res) => {
     });
   }
 };
+

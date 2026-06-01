@@ -23,7 +23,8 @@ exports.CreateVendorShop = async (req, res) => {
             businessType,
             addharNumber,
             lng,
-            lat
+            lat,
+            averagePackingTime
         } = req.body;
 
         // Validation
@@ -85,6 +86,7 @@ exports.CreateVendorShop = async (req, res) => {
             location,
             logo,
             banner,
+            averagePackingTime,
         });
 
         const savedShop = await shop.save();
@@ -130,7 +132,8 @@ exports.EditVendorShop = async (req, res) => {
             businessType,
             addharNumber,
             lng,
-            lat
+            lat,
+            averagePackingTime
         } = req.body;
 
         // Check if shop exists
@@ -163,6 +166,7 @@ exports.EditVendorShop = async (req, res) => {
         if (storeType !== undefined) shop.storeType = storeType;
         if (businessType !== undefined) shop.businessType = businessType;
         if (addharNumber !== undefined) shop.addharNumber = addharNumber;
+        if (averagePackingTime !== undefined) shop.averagePackingTime = averagePackingTime;
 
         if (category !== undefined) {
             if (Array.isArray(category)) {
@@ -629,6 +633,7 @@ exports.getStoresWithProducts = async (req, res) => {
                                 logo: 1,
                                 storeType: 1,
                                 businessType: 1,
+                                averagePackingTime: 1,
                                 categories: "$categoryDetails.name",
                                 products: {
                                     $map: {

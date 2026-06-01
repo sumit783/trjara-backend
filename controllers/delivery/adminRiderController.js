@@ -60,29 +60,29 @@ exports.verifyDocument = async (req, res) => {
 
         // Check if all mandatory documents are verified for the rider
         const riderId = document.rider;
-        const mandatoryDocs = ["aadhar", "pan", "driving_license", "police_verification"];
+        const mandatoryDocs = ["profile_photo", "aadhar", "pan", "driving_license"];
 
         const allDocs = await RiderDocument.find({ rider: riderId });
         const verifiedDocTypes = allDocs
             .filter(doc => doc.verificationStatus === "approved")
             .map(doc => doc.documentType);
 
-        const isFullyVerified = mandatoryDocs.every(type => verifiedDocTypes.includes(type));
+        const allDocsApproved = mandatoryDocs.every(type => verifiedDocTypes.includes(type));
 
-        if (isFullyVerified) {
-            const rider = await Rider.findByIdAndUpdate(riderId, {
-                verificationStatus: "verified",
-                isVerified: true
-            }, { new: true });
+        const rider = await Rider.findById(riderId);
+        if (rider) {
+            const user = await User.findById(rider.user);
+            const isUserVerified = user && (user.isAdminVerified === "verified");
 
-            if (rider) {
-                await User.findByIdAndUpdate(rider.user, { isAdminVerified: "verified" });
+            if (allDocsApproved && isUserVerified) {
+                rider.verificationStatus = "verified";
+                rider.isVerified = true;
+                await rider.save();
+            } else if (status === "rejected") {
+                rider.verificationStatus = "rejected";
+                rider.isVerified = false;
+                await rider.save();
             }
-        } else if (status === "rejected") {
-            await Rider.findByIdAndUpdate(riderId, {
-                verificationStatus: "rejected",
-                isVerified: false
-            });
         }
 
         res.json({
@@ -94,4 +94,4 @@ exports.verifyDocument = async (req, res) => {
         console.error("Error in verifyDocument:", err);
         res.status(500).json({ error: "Server error" });
     }
-};
+};
