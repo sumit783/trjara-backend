@@ -345,7 +345,7 @@ exports.checkoutOrder = async (req, res) => {
             const newOrder = new Order({
                 orderNumber,
                 customerId: userId,
-                shopId: shopId,
+                shopIds: shopIds,
                 items: orderItems,
                 pricing: {
                     subtotal: itemsTotal,
@@ -426,6 +426,7 @@ exports.checkoutOrder = async (req, res) => {
                 orderNumber,
                 customerId: userId,
                 shopId: shopId,
+                shopIds: shopIds,
                 items: orderItems,
                 pricing: {
                     subtotal: itemsTotal,

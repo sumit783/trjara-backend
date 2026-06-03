@@ -6,7 +6,7 @@ const orderSchema = new mongoose.Schema(
   orderNumber: { type: String, unique: true },
 
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  shopId: { type: mongoose.Schema.Types.ObjectId, ref: "Store" },
+  shopIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "Store" }],
 
   items: [OrderItem.schema],
 

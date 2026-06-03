@@ -3,6 +3,7 @@ const Shop = require("../../models/shops/Store");
 const Category = require("../../models/shops/Category");
 const StoreDocument = require("../../models/shops/StoreDocument");
 const Inventory = require("../../models/shops/Inventory");
+const Order = require("../../models/orders/Order");
 const mongoose = require("mongoose");
 
 /**
@@ -315,6 +316,72 @@ exports.getStoreProductCategories = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Server error",
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Get all orders placed at shops owned by the authenticated owner
+ * @route GET /api/owner/orders
+ * @access Private (Owner)
+ */
+exports.getOwnerOrders = async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        // 1. Fetch shops owned by this owner
+        const shops = await Shop.find({ owner: userId }).select("_id name");
+        if (shops.length === 0) {
+            return res.status(200).json({
+                success: true,
+                message: "No shops found for this owner",
+                count: 0,
+                orders: []
+            });
+        }
+
+        const shopIds = shops.map(shop => shop._id);
+
+        // 2. Fetch all orders for these shops
+        const orders = await Order.find({ shopId: { $in: shopIds } })
+            .sort({ createdAt: -1 })
+            .populate("shopId", "name logo")
+            .populate("addressId");
+
+        // 3. Map orders to match requested fields (order id, product, quantity, amount, status)
+        const formattedOrders = orders.map(order => ({
+            orderId: order._id,
+            orderNumber: order.orderNumber,
+            shop: {
+                id: order.shopId?._id,
+                name: order.shopId?.name
+            },
+            items: order.items.map(item => ({
+                productId: item.productId,
+                name: item.name,
+                image: item.image,
+                variant: item.variant,
+                price: item.price,
+                quantity: item.quantity,
+                total: item.total
+            })),
+            amount: order.pricing?.total || 0,
+            status: order.status,
+            placedAt: order.placedAt || order.createdAt
+        }));
+
+        res.status(200).json({
+            success: true,
+            count: formattedOrders.length,
+            orders: formattedOrders
+        });
+
+    } catch (error) {
+        console.error("Error in getOwnerOrders:", error);
+        res.status(500).json({
+            success: false,
+            message: "Server error while fetching owner orders",
             error: error.message
         });
     }

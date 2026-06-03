@@ -7,7 +7,8 @@ const {
     getStoreDetails,
     getUploadedDocuments,
     getVerificationData,
-    checkVerificationStatus
+    checkVerificationStatus,
+    getOwnerOrders
 } = require("../../controllers/shops/ownerController");
 const { 
     getInventoryByQRCode, 
@@ -28,6 +29,9 @@ router.get("/store-details", authMiddleware, getStoreDetails);
 router.get("/uploaded-documents", authMiddleware, getUploadedDocuments);
 router.get("/verification-data", authMiddleware, getVerificationData);
 router.get("/status-check", authMiddleware, checkVerificationStatus);
+
+// Orders Route
+router.get("/orders", authMiddleware, getOwnerOrders);
 
 // Offline Sale Routes
 router.get("/inventory/qr/:code", authMiddleware, getInventoryByQRCode);
