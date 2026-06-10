@@ -3,11 +3,12 @@ const { adminAuthMiddleware } = require("../../middlewares/adminAuthMiddleware")
 const { getAllStores, verifyStore, getStoreDetailsById, getStoresWithProducts } = require("../../controllers/shops/Shop");
 const { getAllUsers, getCustomerById, verifyUser } = require("../../controllers/users/userController");
 const { createVariantOption, getVariantOptions, updateVariantOption, deleteVariantOption } = require("../../controllers/shops/variantOptionController");
-const { getAllRiders, getRiderDocuments, verifyDocument } = require("../../controllers/delivery/adminRiderController");
+const { getAllRiders, getRiderDocuments, verifyDocument, verifyRiderUser } = require("../../controllers/delivery/adminRiderController");
 const { createVehicleType, getAllVehicleTypes, updateVehicleType, deleteVehicleType } = require("../../controllers/delivery/vehicleTypeController");
 const { createCharge, getCharges, getChargeById, updateCharge, deleteCharge, getStoresWithCharges, getProductsWithCharges } = require("../../controllers/admin/chargeController");
 const { createCODRule, getCODRules, getCODRuleById, updateCODRule, deleteCODRule, getStoresWithCODRules, getProductsWithCODRules, getInventoriesWithCODRules } = require("../../controllers/admin/codController");
 const { getAllProducts, getProductById } = require("../../controllers/shops/productController");
+const { getAllOrdersAdmin, getAdminOrderById } = require("../../controllers/admin/adminOrderController");
 const upload = require("../../middlewares/upload");
 
 const router = express.Router();
@@ -34,6 +35,7 @@ router.delete("/variant-options/:id", adminAuthMiddleware, deleteVariantOption);
 router.get("/riders", adminAuthMiddleware, getAllRiders);
 router.get("/riders/:riderId/documents", adminAuthMiddleware, getRiderDocuments);
 router.put("/documents/:docId/verify", adminAuthMiddleware, verifyDocument);
+router.put("/riders/:riderId/verify-user", adminAuthMiddleware, verifyRiderUser);
 
 // Admin-only: User management
 router.get("/users", adminAuthMiddleware, getAllUsers);
@@ -68,5 +70,9 @@ router.delete("/cod-rules/:id", adminAuthMiddleware, deleteCODRule);
 // Admin-only: Products
 router.get("/products", adminAuthMiddleware, getAllProducts);
 router.get("/products/:productId", adminAuthMiddleware, getProductById);
+
+// Admin-only: Orders
+router.get("/orders", adminAuthMiddleware, getAllOrdersAdmin);
+router.get("/orders/:id", adminAuthMiddleware, getAdminOrderById);
 
 module.exports = router;

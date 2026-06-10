@@ -33,15 +33,9 @@ const bankAccountSchema = new mongoose.Schema(
       default: false
     },
 
-    isVerified: {
+    isActive: {
       type: Boolean,
-      default: false
-    },
-
-    adminVerficationStatus: {
-      type: String,
-      enum: ["pending", "verified", "rejected", "reuploaded"],
-      default: "pending"
+      default: true
     },
   },
   { timestamps: true }

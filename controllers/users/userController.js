@@ -142,8 +142,12 @@ exports.verifyUser = async (req, res) => {
     
     if (status === "verified") {
       user.isActive = true;
-      // If a role is provided and it's a valid transition, update it
-      if (role && ["owner", "rider", "staff"].includes(role)) {
+      // Automatically assign rider role if a Rider profile exists
+      const Rider = require("../../models/rider/Rider");
+      const hasRiderProfile = await Rider.exists({ user: id });
+      if (hasRiderProfile) {
+        user.role = "rider";
+      } else if (role && ["owner", "rider", "staff"].includes(role)) {
         user.role = role;
       }
     } else if (status === "rejected") {
@@ -164,7 +168,7 @@ exports.verifyUser = async (req, res) => {
       const rider = await Rider.findOne({ user: id });
       if (rider) {
         if (status === "verified") {
-          const mandatoryDocs = ["profile_photo", "aadhar", "pan", "driving_license"];
+          const mandatoryDocs = ["profile_photo", "aadhar_front", "aadhar_back", "pan", "driving_license"];
           const allDocs = await RiderDocument.find({ rider: rider._id });
           const verifiedDocTypes = allDocs
             .filter(doc => doc.verificationStatus === "approved")

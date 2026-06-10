@@ -72,6 +72,76 @@ const findShortestPath = (userCoords, stores) => {
 };
 
 /**
+ * Helper to group order items by their store and attach it as a `stores` list on the order object.
+ * @param {Object} order Mongoose order document
+ * @returns {Object} Plain JavaScript object with `stores` grouping
+ */
+const formatOrderWithStores = (order) => {
+    if (!order) return null;
+    const orderObj = order.toObject();
+    
+    const storeMap = {};
+    
+    const populatedStores = {};
+    if (orderObj.shopIds && Array.isArray(orderObj.shopIds)) {
+        orderObj.shopIds.forEach(store => {
+            if (store && store._id) {
+                const storeIdStr = store._id.toString();
+                populatedStores[storeIdStr] = store;
+                
+                storeMap[storeIdStr] = {
+                    store: store,
+                    items: []
+                };
+            }
+        });
+    }
+    
+    if (orderObj.items && Array.isArray(orderObj.items)) {
+        orderObj.items.forEach(item => {
+            let storeId = item.shopId && item.shopId._id ? item.shopId._id.toString() : (item.shopId ? item.shopId.toString() : null);
+            
+            if (!storeId && item.productId) {
+                storeId = item.productId.shop && item.productId.shop._id ? item.productId.shop._id.toString() : (item.productId.shop ? item.productId.shop.toString() : null);
+            }
+            
+            if (!storeId && item.inventoryId) {
+                storeId = item.inventoryId.store && item.inventoryId.store._id ? item.inventoryId.store._id.toString() : (item.inventoryId.store ? item.inventoryId.store.toString() : null);
+            }
+            
+            if (storeId) {
+                const storeInfo = populatedStores[storeId] || item.shopId || (
+                    item.productId && item.productId.shop ? item.productId.shop : (
+                        item.inventoryId && item.inventoryId.store ? item.inventoryId.store : { _id: storeId }
+                    )
+                );
+                
+                if (!storeMap[storeId]) {
+                    storeMap[storeId] = {
+                        store: storeInfo,
+                        items: []
+                    };
+                }
+                
+                const itemObj = { ...item };
+                itemObj.shopId = storeId;
+                
+                storeMap[storeId].items.push(itemObj);
+            }
+        });
+    }
+    
+    orderObj.stores = Object.values(storeMap);
+    
+    // Remove raw lists to only send grouped stores representation
+    delete orderObj.shopIds;
+    delete orderObj.items;
+    delete orderObj.shopId;
+    
+    return orderObj;
+};
+
+/**
  * Checkout Cart and Initiate Payment (Razorpay Order creation or COD Order creation)
  * @route POST /api/orders/checkout
  * @access Private
@@ -249,6 +319,7 @@ exports.checkoutOrder = async (req, res) => {
             return {
                 productId: item.productId,
                 inventoryId: inv._id || inv,
+                shopId: item.shopId,
                 name: item.name,
                 image: item.imageUrl,
                 variant: {
@@ -394,10 +465,25 @@ exports.checkoutOrder = async (req, res) => {
             cart.couponId = undefined;
             await cart.save();
 
+            // Populate and format order
+            const populatedOrder = await Order.findById(newOrder._id)
+                .populate("shopIds", "name logo phone address city")
+                .populate("items.shopId", "name logo phone address city")
+                .populate({
+                    path: "items.inventoryId",
+                    select: "-variantOptions -productVariant",
+                    populate: {
+                        path: "variant"
+                    }
+                })
+                .populate("items.productId", "-description");
+
+            const formattedOrder = formatOrderWithStores(populatedOrder);
+
             return res.status(201).json({
                 success: true,
                 message: "Order placed successfully (Cash on Delivery)",
-                order: newOrder
+                order: formattedOrder
             });
         }
 
@@ -425,7 +511,6 @@ exports.checkoutOrder = async (req, res) => {
             const pendingOrder = new Order({
                 orderNumber,
                 customerId: userId,
-                shopId: shopId,
                 shopIds: shopIds,
                 items: orderItems,
                 pricing: {
@@ -587,10 +672,25 @@ exports.verifyPayment = async (req, res) => {
             await cart.save();
         }
 
+        // Populate and format order
+        const populatedOrder = await Order.findById(order._id)
+            .populate("shopIds", "name logo phone address city")
+            .populate("items.shopId", "name logo phone address city")
+            .populate({
+                path: "items.inventoryId",
+                select: "-variantOptions -productVariant",
+                populate: {
+                    path: "variant"
+                }
+            })
+            .populate("items.productId", "-description");
+
+        const formattedOrder = formatOrderWithStores(populatedOrder);
+
         return res.status(200).json({
             success: true,
             message: "Payment verified and order placed successfully",
-            order
+            order: formattedOrder
         });
 
     } catch (error) {
@@ -611,7 +711,8 @@ exports.getCustomerOrders = async (req, res) => {
         // Fetch all orders for the customer sorted by newest first
         const orders = await Order.find({ customerId: userId })
             .sort({ createdAt: -1 })
-            .populate("shopId", "name logo phone address city") // populate store details
+            .populate("shopIds", "name logo phone address city") // populate store details
+            .populate("items.shopId", "name logo phone address city") // populate store details on each item
             .populate({
                 path: "items.inventoryId",
                 select: "-variantOptions -productVariant",
@@ -621,10 +722,12 @@ exports.getCustomerOrders = async (req, res) => {
             })
             .populate("items.productId", "-description");
 
+        const formattedOrders = orders.map(order => formatOrderWithStores(order));
+
         res.status(200).json({
             success: true,
-            count: orders.length,
-            orders
+            count: formattedOrders.length,
+            orders: formattedOrders
         });
     } catch (error) {
         console.error("Error in getCustomerOrders:", error);
@@ -647,7 +750,8 @@ exports.getOrderDetails = async (req, res) => {
         }
 
         const order = await Order.findOne({ _id: orderId, customerId: userId })
-            .populate("shopId", "name logo phone banner address city state pincode location")
+            .populate("shopIds", "name logo phone banner address city state pincode location")
+            .populate("items.shopId", "name logo phone banner address city state pincode location")
             .populate("addressId")
             .populate("riderId", "name phone profileImageUrl")
             .populate({
@@ -663,9 +767,11 @@ exports.getOrderDetails = async (req, res) => {
             return res.status(404).json({ success: false, message: "Order not found" });
         }
 
+        const formattedOrder = formatOrderWithStores(order);
+
         res.status(200).json({
             success: true,
-            order
+            order: formattedOrder
         });
     } catch (error) {
         console.error("Error in getOrderDetails:", error);

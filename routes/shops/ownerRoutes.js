@@ -8,7 +8,15 @@ const {
     getUploadedDocuments,
     getVerificationData,
     checkVerificationStatus,
-    getOwnerOrders
+    getOwnerOrders,
+    updateOrderItemStatus,
+    getOwnerOrderDetails,
+    addBankAccount,
+    getBankAccounts,
+    setPrimaryBankAccount,
+    deleteBankAccount,
+    createWithdrawalRequest,
+    getOwnerWithdrawalRequests
 } = require("../../controllers/shops/ownerController");
 const { 
     getInventoryByQRCode, 
@@ -32,10 +40,23 @@ router.get("/status-check", authMiddleware, checkVerificationStatus);
 
 // Orders Route
 router.get("/orders", authMiddleware, getOwnerOrders);
+router.get("/orders/:orderId", authMiddleware, getOwnerOrderDetails);
+router.put("/orders/:orderId/items/:itemId/status", authMiddleware, updateOrderItemStatus);
 
 // Offline Sale Routes
 router.get("/inventory/qr/:code", authMiddleware, getInventoryByQRCode);
 router.get("/inventory/:inventoryId/qr", authMiddleware, getQRCodeByInventoryId);
 router.post("/sell-offline", authMiddleware, processOfflineSale);
+
+// Bank Accounts Routes
+router.post("/bank-accounts", authMiddleware, addBankAccount);
+router.get("/bank-accounts", authMiddleware, getBankAccounts);
+router.get("/bank-details", authMiddleware, getBankAccounts);
+router.put("/bank-accounts/:id/primary", authMiddleware, setPrimaryBankAccount);
+router.delete("/bank-accounts/:id", authMiddleware, deleteBankAccount);
+
+// Withdrawals Routes
+router.post("/withdrawals", authMiddleware, createWithdrawalRequest);
+router.get("/withdrawals", authMiddleware, getOwnerWithdrawalRequests);
 
 module.exports = router;

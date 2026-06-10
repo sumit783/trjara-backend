@@ -4,7 +4,6 @@ const OrderItem = require("./OrderItem");
 const orderSchema = new mongoose.Schema(
 {
   orderNumber: { type: String, unique: true },
-
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   shopIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "Store" }],
 

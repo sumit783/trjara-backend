@@ -12,7 +12,6 @@ const pickupVerificationSchema = new mongoose.Schema({
       name: String,
       expectedQty: Number,
       pickedQty: Number,
-
       verified: { type: Boolean, default: false }
     }
   ],

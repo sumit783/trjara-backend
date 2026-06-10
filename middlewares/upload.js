@@ -14,6 +14,7 @@ const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: "trjara",
+    resource_type: "auto",
     allowed_formats: ["jpg", "png", "jpeg", "pdf"],
     public_id: (req, file) => {
         const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
